@@ -1,0 +1,26 @@
+# flutter_native_splash configuration
+# Documentation: https://pub.dev/packages/flutter_native_splash
+
+flutter_native_splash:
+  # Background color for light mode (white)
+  color: "#FFFFFF"
+
+  # Background color for dark mode (AppColors.backgroundDark)
+  color_dark: "#0D1B2A"
+
+  # Android specific settings
+  android: true
+  
+  # iOS specific settings
+  ios: true
+
+  # Web specific settings
+  web: false
+
+  # Fullscreen mode
+  fullscreen: true
+
+  # Android 12+ configuration
+  android_12:
+    color: "#FFFFFF"
+    color_dark: "#0D1B2A"

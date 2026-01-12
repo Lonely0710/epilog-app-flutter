@@ -1,0 +1,77 @@
+name: drama_tracker_flutter
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.1.0
+  go_router: ^17.0.1
+  google_fonts: ^6.3.3
+  webview_flutter: ^4.13.0
+  http: ^1.2.0
+  html: ^0.15.4
+  shared_preferences: ^2.5.4
+  flutter_secure_storage: ^10.0.0
+  cached_network_image: ^3.3.0
+  url_launcher: ^6.2.0
+  lottie: ^3.3.2
+  supabase_flutter: ^2.12.0
+  avatar_plus: ^0.0.5
+  image_picker: ^1.2.1
+  lava_lamp_effect: ^1.0.3
+  flutter_svg: ^2.2.3
+  liquid_glass_renderer: ^0.2.0-dev.4
+  animations: ^2.1.1
+  share_plus: ^12.0.1
+  path_provider: ^2.1.5
+  flutter_dotenv: ^5.1.0
+  flutter_native_splash: 2.4.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icons/ic_logo.png"
+  min_sdk_android: 21
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/
+    - assets/icons/
+    - assets/header/
+    - assets/font/
+    - assets/lottie/
+
+  fonts:
+    - family: Pacifico
+      fonts:
+        - asset: assets/font/pacifico_regular.ttf
+    - family: FangZheng
+      fonts:
+        - asset: assets/font/fangzheng_regular.ttf
+    - family: LibreBaskerville
+      fonts:
+        - asset: assets/font/LibreBaskerville-VariableFont_wght.ttf
+        - asset: assets/font/LibreBaskerville-Italic-VariableFont_wght.ttf
+          style: italic
+    - family: HanSerifSC
+      fonts:
+        - asset: assets/font/hanserifsc_bold.otf
+    - family: BitcountGridDoubleInk
+      fonts:
+        - asset: assets/font/BitcountGridDoubleInk-VariableFont.ttf
+    - family: CourierPrime
+      fonts:
+        - asset: assets/font/CourierPrime-Regular.ttf
