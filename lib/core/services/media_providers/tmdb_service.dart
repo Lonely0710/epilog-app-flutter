@@ -50,6 +50,18 @@ class TmdbService {
     return _discoverMedia('tv', page, year, genre);
   }
 
+  Future<List<Media>> getTopRatedMoviesThisYear({int limit = 10}) async {
+    final year = DateTime.now().year;
+    final results = await _discoverMedia('movie', 1, year, null);
+    return results.take(limit).toList();
+  }
+
+  Future<List<Media>> getTopRatedTVShowsThisYear({int limit = 10}) async {
+    final year = DateTime.now().year;
+    final results = await _discoverMedia('tv', 1, year, null);
+    return results.take(limit).toList();
+  }
+
   Future<List<Media>> _discoverMedia(
     String type,
     int page,
@@ -127,10 +139,6 @@ class TmdbService {
 
       // 3. Map to Entity (with optional details fetch)
       if (fetchDetails) {
-        // Detailed fetch also goes through proxy individually
-        // Note: For performance, ideally specific detail endpoint should be used
-        // But for consistency with V3 implementation, we iterate.
-        // Optimization: We could add a 'batch' endpoint to proxy later.
         final detailedResults = await Future.wait(
           filtered.map((item) => _fetchDetailViaProxy(item)),
         );
@@ -180,7 +188,6 @@ class TmdbService {
   }
 
   int? _getGenreId(String type, String genreName) {
-    // ... genre mapping logic remains unchanged ...
     final common = {
       '剧情': 18,
       '喜剧': 35,
