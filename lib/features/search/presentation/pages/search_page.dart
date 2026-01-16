@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/domain/entities/media.dart';
 import '../../domain/repositories/search_repository.dart';
@@ -25,6 +26,7 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final SearchRepository _searchRepository = SearchRepositoryImpl();
   final SearchHistoryService _historyService = SearchHistoryService();
 
@@ -33,6 +35,7 @@ class _SearchPageState extends State<SearchPage> {
   String _errorMessage = '';
   String _lastSearchedQuery = '';
   List<SearchHistoryItem> _history = [];
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -56,11 +59,31 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
-  Future<void> _performSearch(String query) async {
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 1000), () {
+      if (query.isNotEmpty && query != _lastSearchedQuery) {
+        _performSearch(query);
+      }
+    });
+  }
+
+  void _onSearchSubmitted(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel(); // Cancel pending debounce
+    _searchFocusNode.unfocus(); // Dismiss keyboard
+    if (query.isNotEmpty) {
+      _performSearch(query, force: true);
+    }
+  }
+
+  Future<void> _performSearch(String query, {bool force = false}) async {
     if (query.isEmpty) return;
+    if (!force && query == _lastSearchedQuery) return;
 
     setState(() {
       _isLoading = true;
@@ -92,8 +115,7 @@ class _SearchPageState extends State<SearchPage> {
 
       // Save to history (Non-blocking)
       try {
-        await _historyService.addHistory(
-            query, 'mixed'); // Use 'mixed' or keep existing types
+        await _historyService.addHistory(query, 'mixed'); // Use 'mixed' or keep existing types
         if (mounted) {
           await _loadHistory();
         }
@@ -120,8 +142,7 @@ class _SearchPageState extends State<SearchPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
-    final textColor =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
     final hintColor = Theme.of(context).hintColor;
 
     return Scaffold(
@@ -130,11 +151,9 @@ class _SearchPageState extends State<SearchPage> {
         titleSpacing: 0,
         backgroundColor: scaffoldBg,
         elevation: 0,
-        title: Text('搜索',
-            style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+        title: Text('搜索', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
         leading: IconButton(
-          icon:
-              Icon(Icons.close, color: isDark ? Colors.grey[400] : Colors.grey),
+          icon: Icon(Icons.close, color: isDark ? Colors.grey[400] : Colors.grey),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -142,13 +161,10 @@ class _SearchPageState extends State<SearchPage> {
         children: [
           // Search Bar Area
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Container(
               decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.grey[200],
+                color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[200],
                 borderRadius: BorderRadius.circular(24),
                 border: isDark
                     ? Border.all(
@@ -159,31 +175,27 @@ class _SearchPageState extends State<SearchPage> {
               ),
               child: TextField(
                 controller: _searchController,
+                focusNode: _searchFocusNode,
                 textInputAction: TextInputAction.search,
                 autofocus: true,
                 style: TextStyle(color: textColor),
                 onSubmitted: (value) {
-                  _performSearch(value);
+                  _onSearchSubmitted(value);
                 },
                 decoration: InputDecoration(
                   hintText: widget.searchType == 'movie' ? '搜索电影/电视剧' : '搜索动漫',
                   hintStyle: TextStyle(color: hintColor),
-                  prefixIcon: Icon(Icons.search,
-                      color: isDark ? Colors.grey[400] : Colors.grey),
+                  prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey[400] : Colors.grey),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? (_searchController.text != _lastSearchedQuery
                           ? IconButton(
-                              icon: Icon(Icons.check_circle,
-                                  size: 20, color: AppTheme.primary),
+                              icon: Icon(Icons.check_circle, size: 20, color: AppTheme.primary),
                               onPressed: () {
-                                _performSearch(_searchController.text);
+                                _onSearchSubmitted(_searchController.text);
                               },
                             )
                           : IconButton(
-                              icon: Icon(Icons.delete,
-                                  size: 20,
-                                  color:
-                                      isDark ? Colors.grey[400] : Colors.grey),
+                              icon: Icon(Icons.delete, size: 20, color: isDark ? Colors.grey[400] : Colors.grey),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
@@ -191,6 +203,8 @@ class _SearchPageState extends State<SearchPage> {
                                   _errorMessage = '';
                                   _lastSearchedQuery = '';
                                 });
+                                // Cancel any pending debounce
+                                _debounce?.cancel();
                               },
                             ))
                       : null,
@@ -199,6 +213,7 @@ class _SearchPageState extends State<SearchPage> {
                 ),
                 onChanged: (text) {
                   setState(() {}); // trigger rebuild to show/hide clear button
+                  _onSearchChanged(text);
                 },
               ),
             ),
@@ -207,20 +222,14 @@ class _SearchPageState extends State<SearchPage> {
           // Content Area
           Expanded(
             child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(color: AppTheme.primary))
+                ? Center(child: CircularProgressIndicator(color: AppTheme.primary))
                 : _errorMessage.isNotEmpty
-                    ? Center(
-                        child: Text(_errorMessage,
-                            style: TextStyle(color: textColor)))
+                    ? Center(child: Text(_errorMessage, style: TextStyle(color: textColor)))
                     : (_results.isEmpty &&
-                            _searchController.text
-                                .isEmpty) // Show history when no results and input empty
+                            _searchController.text.isEmpty) // Show history when no results and input empty
                         ? _buildHistorySection(context)
                         : _results.isEmpty
-                            ? Center(
-                                child: Text('没有找到相关结果',
-                                    style: TextStyle(color: textColor)))
+                            ? Center(child: Text('没有找到相关结果', style: TextStyle(color: textColor)))
                             : ListView.builder(
                                 itemCount: _results.length,
                                 itemBuilder: (context, index) {
@@ -229,6 +238,7 @@ class _SearchPageState extends State<SearchPage> {
                                     searchType: widget.searchType,
                                     onTap: () {
                                       // Optional: Handle item tap if unrelated to specific buttons
+                                      _searchFocusNode.unfocus();
                                     },
                                   );
                                 },
@@ -241,8 +251,7 @@ class _SearchPageState extends State<SearchPage> {
 
   Widget _buildHistorySection(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
 
     if (_history.isEmpty) {
       return const SizedBox.shrink();
@@ -264,8 +273,7 @@ class _SearchPageState extends State<SearchPage> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.delete_outline,
-                    size: 20, color: isDark ? Colors.grey[400] : Colors.grey),
+                icon: Icon(Icons.delete_outline, size: 20, color: isDark ? Colors.grey[400] : Colors.grey),
                 onPressed: () async {
                   await _historyService.clearHistory();
                   await _loadHistory();
@@ -279,13 +287,9 @@ class _SearchPageState extends State<SearchPage> {
             runSpacing: 8.0,
             children: _history.map((item) {
               return ActionChip(
-                backgroundColor: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.grey[100],
+                backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
                 elevation: 0,
-                side: isDark
-                    ? BorderSide(color: Colors.white.withValues(alpha: 0.1))
-                    : BorderSide.none,
+                side: isDark ? BorderSide(color: Colors.white.withValues(alpha: 0.1)) : BorderSide.none,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),

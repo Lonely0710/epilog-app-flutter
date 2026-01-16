@@ -294,7 +294,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                           )
                         : const Text(
-                            "Sign up",
+                            "注 册",
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

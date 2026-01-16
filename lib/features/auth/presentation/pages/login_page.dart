@@ -274,7 +274,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           )
                         : const Text(
-                            "Sign in",
+                            "登 录",
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

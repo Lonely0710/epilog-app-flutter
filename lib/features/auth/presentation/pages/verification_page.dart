@@ -321,7 +321,7 @@ class _VerificationPageState extends State<VerificationPage> {
                           ),
                         )
                       : const Text(
-                          "Verify",
+                          "验 证",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

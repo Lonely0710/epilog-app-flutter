@@ -47,7 +47,7 @@ class AuthPage extends StatelessWidget {
               // Social Login Buttons
               // Social Login Buttons
               SocialLoginButton(
-                text: "Continue with Github",
+                text: "Github 授权登录",
                 iconPath: 'assets/icons/ic_github.svg',
                 onPressed: () async {
                   try {
@@ -65,7 +65,7 @@ class AuthPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               SocialLoginButton(
-                text: "Continue with Google",
+                text: "Google 授权登录",
                 iconPath: 'assets/icons/ic_google.svg',
                 onPressed: () {
                   // Google Login

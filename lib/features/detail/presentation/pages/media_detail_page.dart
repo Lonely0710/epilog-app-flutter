@@ -9,6 +9,7 @@ import '../../../../core/domain/entities/media.dart';
 import '../../../collections/data/repositories/collection_repository_impl.dart';
 import '../widgets/rating_display_widget.dart';
 import '../widgets/watch_status_bottom_sheet.dart';
+import '../widgets/character_list_widget.dart';
 
 /// Media detail page displaying full information about a movie/TV show/anime.
 class MediaDetailPage extends StatefulWidget {
@@ -110,6 +111,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                   // Staff / Cast
                   if (widget.media.mediaType == 'anime') ...[
                     _buildAnimeStaffSection(),
+                    CharacterListWidget(media: widget.media),
                   ] else ...[
                     if (widget.media.directors.isNotEmpty) ...[
                       _buildDirectorsSection(),

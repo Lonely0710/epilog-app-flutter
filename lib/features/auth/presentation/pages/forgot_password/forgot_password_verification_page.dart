@@ -262,7 +262,7 @@ class _ForgotPasswordVerificationPageState extends State<ForgotPasswordVerificat
                           width: 24,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text("Verify",
+                      : const Text("验 证",
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
               ),

@@ -28,7 +28,8 @@ class SearchRepositoryImpl implements SearchRepository {
 
   @override
   Future<List<Media>> searchAnime(String query) async {
-    return _bangumiService.searchAnime(query);
+    final rawResults = await _bangumiService.searchAnime(query);
+    return _filterRelevantResults(rawResults);
   }
 
   @override
@@ -56,8 +57,18 @@ class SearchRepositoryImpl implements SearchRepository {
 
     // Priority: TMDb > Maoyan > Douban
     // Deduplication logic based on title and year
-    return _deduplicateResults(
-        [...tmdbResults, ...maoyanResults, ...doubanResults]);
+    final merged = _deduplicateResults([...tmdbResults, ...maoyanResults, ...doubanResults]);
+    return _filterRelevantResults(merged);
+  }
+
+  List<Media> _filterRelevantResults(List<Media> results) {
+    // Filter out items that are likely low quality or empty placeholders
+    return results.where((item) {
+      if (item.posterUrl.isEmpty) return false;
+      if (item.titleZh.isEmpty || item.titleZh == '未知标题') return false;
+      // You can add more strict filters here if needed
+      return true;
+    }).toList();
   }
 
   List<Media> _deduplicateResults(List<Media> allResults) {
@@ -67,10 +78,8 @@ class SearchRepositoryImpl implements SearchRepository {
     for (var result in allResults) {
       // Normalize key: Title + Year (e.g. "inception_2010")
       // Remove spaces, punctuation, lowercase
-      final cleanTitle = result.titleZh
-          .replaceAll(RegExp(r'\s+'), '')
-          .replaceAll(RegExp(r'[^\w\u4e00-\u9fa5]'), '')
-          .toLowerCase();
+      final cleanTitle =
+          result.titleZh.replaceAll(RegExp(r'\s+'), '').replaceAll(RegExp(r'[^\w\u4e00-\u9fa5]'), '').toLowerCase();
       final key = '${cleanTitle}_${result.year}';
 
       if (!seenKeys.contains(key)) {

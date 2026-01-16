@@ -4,6 +4,7 @@ import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart';
 import 'package:http/http.dart' as http;
 import '../../domain/entities/media.dart';
+import '../../domain/entities/character.dart';
 import '../../data/models/bangumi_model.dart';
 
 class BangumiService {
@@ -124,8 +125,7 @@ class BangumiService {
       }
 
       final document = parser.parse(utf8.decode(response.bodyBytes));
-      final weekItems = document
-          .querySelectorAll('#colunmSingle .BgmCalendar ul.large > li.week');
+      final weekItems = document.querySelectorAll('#colunmSingle .BgmCalendar ul.large > li.week');
 
       final Map<String, List<Media>> schedule = {};
 
@@ -222,6 +222,109 @@ class BangumiService {
     } catch (e) {
       log('Bangumi calendar fetch error: $e');
       return {};
+    }
+  }
+
+  Future<List<Media>> getTrends() async {
+    const url = '$_baseUrl/anime/browser/?sort=trends';
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Cookie': 'chii_searchDateLine=0',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        log('Bangumi Trends API Error: ${response.statusCode}');
+        return [];
+      }
+
+      final document = parser.parse(utf8.decode(response.bodyBytes));
+      final items = document.querySelectorAll('#browserItemList > li');
+      List<Future<Media?>> futures = [];
+
+      // Limit to top 20
+      final topItems = items.take(20);
+
+      for (var item in topItems) {
+        futures.add(_processItem(item));
+      }
+
+      final results = await Future.wait(futures);
+      return results.whereType<Media>().toList();
+    } catch (e) {
+      log('Bangumi trends error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Character>> getCharacters(String subjectId) async {
+    final url = '$_baseUrl/subject/$subjectId/characters';
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Cookie': 'chii_searchDateLine=0',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        log('Bangumi Characters API Error: ${response.statusCode}');
+        return [];
+      }
+
+      final document = parser.parse(utf8.decode(response.bodyBytes));
+      // Use generic selector for character list items
+      final items = document.querySelectorAll('#browserItemList li .user');
+      // If .user is not found, try .item or direct li children if structure varies
+      final fallbackItems = items.isEmpty ? document.querySelectorAll('#browserItemList .item') : items;
+
+      List<Character> characters = [];
+
+      for (var item in fallbackItems) {
+        String name = '';
+        String nameCn = '';
+
+        // Name Extraction
+        final h2 = item.querySelector('h2') ?? item.querySelector('h3');
+        if (h2 != null) {
+          final a = h2.querySelector('a');
+          if (a != null) name = a.text.trim();
+          final span = h2.querySelector('span.tip');
+          if (span != null) nameCn = span.text.trim();
+        }
+
+        // Image Extraction
+        String imageUrl = '';
+        final img = item.querySelector('img.avatar') ?? item.querySelector('img');
+        if (img != null) {
+          imageUrl = img.attributes['src'] ?? '';
+          if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
+        }
+
+        // Role Extraction
+        String role = '';
+        final badge = item.querySelector('.badge_job_tip') ?? item.querySelector('.badge_job');
+        if (badge != null) role = badge.text.trim();
+
+        // CV Extraction
+        String cv = '';
+        final actorLink = item.querySelector('.actorBadge p a.l');
+        if (actorLink != null) cv = actorLink.text.trim();
+
+        if (name.isNotEmpty) {
+          characters.add(Character(name: name, nameCn: nameCn, imageUrl: imageUrl, role: role, cv: cv));
+        }
+      }
+      return characters;
+    } catch (e) {
+      log('Bangumi fetch characters error: $e');
+      return [];
     }
   }
 }
