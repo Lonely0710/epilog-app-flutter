@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:flutter_notion_avatar/flutter_notion_avatar_controller.dart';
 import '../../../../app/animations/dialog_animations.dart';
 import '../widgets/settings_background.dart';
 import '../widgets/typewriter_slogan.dart';
@@ -39,10 +41,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   // Avatar Editing State
   final GlobalKey _avatarKey = GlobalKey();
-  String _avatarSeed = "epilog";
+  NotionAvatarController? _avatarController;
   File? _localImageFile;
   bool _isUsingLocalImage = false;
   bool _isUploading = false;
+  bool _isPickingImage = false;
 
   @override
   void initState() {
@@ -52,8 +55,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   void _regenerateSeed() {
-    setState(
-        () => _avatarSeed = DateTime.now().millisecondsSinceEpoch.toString());
+    _avatarController?.random();
   }
 
   void _loadProfile() {
@@ -68,25 +70,80 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   // --- Avatar Logic ---
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-        source: ImageSource.gallery, maxWidth: 512, maxHeight: 512);
+    if (_isPickingImage) return;
 
-    if (pickedFile != null) {
+    setState(() {
+      _isPickingImage = true;
+    });
+
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: pickedFile.path,
+          maxWidth: 512,
+          maxHeight: 512,
+          compressQuality: 80,
+          compressFormat: ImageCompressFormat.jpg,
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: '裁剪头像',
+              toolbarColor: AppTheme.primary,
+              toolbarWidgetColor: Colors.white,
+              initAspectRatio: CropAspectRatioPreset.square,
+              lockAspectRatio: true,
+              hideBottomControls: true,
+              cropStyle: CropStyle.circle,
+              aspectRatioPresets: [CropAspectRatioPreset.square],
+            ),
+            IOSUiSettings(
+              title: '裁剪头像',
+              aspectRatioLockEnabled: true,
+              resetAspectRatioEnabled: false,
+              aspectRatioPickerButtonHidden: true,
+              doneButtonTitle: '完成',
+              cancelButtonTitle: '取消',
+              cropStyle: CropStyle.circle,
+              aspectRatioPresets: [CropAspectRatioPreset.square],
+            ),
+          ],
+        );
+
+        if (croppedFile != null) {
+          setState(() {
+            _localImageFile = File(croppedFile.path);
+            _isUsingLocalImage = true;
+          });
+          // Auto-save when picking local image
+          _saveAvatar();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    } finally {
       setState(() {
-        _localImageFile = File(pickedFile.path);
-        _isUsingLocalImage = true;
+        _isPickingImage = false;
       });
-      // Auto-save when picking local image
-      _saveAvatar();
     }
   }
 
   Future<void> _onRefreshAvatar() async {
-    _regenerateSeed();
+    // Only regenerate if showing the NotionAvatar
+    if (_avatarUrl == null && !_isUsingLocalImage) {
+      _regenerateSeed();
+    }
+
     setState(() {
       _isUsingLocalImage = false;
       _localImageFile = null;
+      _avatarUrl = null; // Clear existing URL to show random avatar
     });
     // Wait for render, then save
     WidgetsBinding.instance.addPostFrameCallback((_) => _saveAvatar());
@@ -94,13 +151,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<Uint8List?> _captureAvatarPng() async {
     try {
-      RenderRepaintBoundary? boundary = _avatarKey.currentContext
-          ?.findRenderObject() as RenderRepaintBoundary?;
+      RenderRepaintBoundary? boundary = _avatarKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) return null;
       await Future.delayed(const Duration(milliseconds: 50)); // Wait for render
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (e) {
       debugPrint("Capture error: $e");
@@ -108,22 +163,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  Future<String?> _uploadFile(
-      String path, Uint8List bytes, String contentType) async {
+  Future<String?> _uploadFile(String path, Uint8List bytes, String contentType) async {
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
       final fileExt = contentType == 'image/png' ? 'png' : 'jpg';
-      final fileName =
-          '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final fileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 
       await Supabase.instance.client.storage.from('avatars').uploadBinary(
             fileName,
             bytes,
             fileOptions: FileOptions(contentType: contentType, upsert: true),
           );
-      return Supabase.instance.client.storage
-          .from('avatars')
-          .getPublicUrl(fileName);
+      return Supabase.instance.client.storage.from('avatars').getPublicUrl(fileName);
     } catch (e) {
       debugPrint("Upload error: $e");
       return null;
@@ -152,14 +203,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
         setState(() => _avatarUrl = newUrl);
         if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('头像已更新')));
+          AppSnackBar.showSuccess(context, '头像已更新');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('更新失败: $e')));
+        AppSnackBar.showError(context, message: '更新失败: $e');
       }
     } finally {
       if (mounted) {
@@ -197,8 +246,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               TextField(
                 controller: controller,
                 autofocus: true,
-                style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyLarge?.color),
+                style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                 decoration: InputDecoration(
                   hintText: "请输入新的昵称",
                   hintStyle: TextStyle(color: Theme.of(context).hintColor),
@@ -208,8 +256,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
               const SizedBox(height: 24),
@@ -262,9 +309,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('退出失败: $e')),
-          );
+          AppSnackBar.showError(context, message: '退出失败: $e');
         }
       }
     }
@@ -273,9 +318,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _launchUrl(String urlString) async {
     final Uri url = Uri.parse(urlString);
     // For mailto, we let the platform decide the best mode
-    final mode = url.scheme == 'mailto'
-        ? LaunchMode.platformDefault
-        : LaunchMode.externalApplication;
+    final mode = url.scheme == 'mailto' ? LaunchMode.platformDefault : LaunchMode.externalApplication;
 
     try {
       if (!await launchUrl(url, mode: mode)) {
@@ -316,8 +359,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         final dialogBg = Theme.of(context).cardColor;
 
         return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: dialogBg,
           child: Stack(
             children: [
@@ -333,8 +375,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         color: AppTheme.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.notifications_active_outlined,
-                          color: AppTheme.primary, size: 32),
+                      child: const Icon(Icons.notifications_active_outlined, color: AppTheme.primary, size: 32),
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -363,10 +404,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 right: 8,
                 child: IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close,
-                      color: isDark
-                          ? Colors.grey[400]
-                          : Theme.of(context).hintColor),
+                  icon: Icon(Icons.close, color: isDark ? Colors.grey[400] : Theme.of(context).hintColor),
                   splashRadius: 20,
                 ),
               ),
@@ -409,13 +447,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         // Avatar with Edit Capability
                         SettingsAvatar(
                           avatarKey: _avatarKey,
-                          avatarSeed: _avatarSeed,
                           avatarUrl: _avatarUrl,
                           isUsingLocalImage: _isUsingLocalImage,
                           localImageFile: _localImageFile,
                           isUploading: _isUploading,
                           onRefresh: _onRefreshAvatar,
                           onPickImage: _pickImage,
+                          onCreated: (c) => _avatarController = c,
                         ),
                         const SizedBox(height: 16),
                         const TypewriterSlogan(),
@@ -466,8 +504,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               iconColor: AppTheme.primary,
               title: '通知设置',
               subtitle: '管理应用通知',
-              trailing: const Icon(Icons.chevron_right,
-                  color: AppTheme.textSecondary),
+              trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
               onTap: _showUnderDevelopmentDialog,
             ),
             const SizedBox(height: 12),
@@ -476,8 +513,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               iconColor: AppTheme.primary,
               title: '数据管理',
               subtitle: '导出收藏数据',
-              trailing: const Icon(Icons.chevron_right,
-                  color: AppTheme.textSecondary),
+              trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
               onTap: _showExportDialog,
             ),
             const SizedBox(height: 12),
@@ -485,10 +521,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             SettingsTile(
               icon: Icons.logout_rounded,
               iconColor: AppTheme.error,
-              title: 'Log out',
+              title: '退出登录',
               subtitle: '退出当前账号',
-              trailing: const Icon(Icons.chevron_right,
-                  color: AppTheme.textSecondary),
+              trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
               onTap: _handleLogout,
             ),
             const SizedBox(height: 20),
@@ -505,18 +540,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                           color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context)
-                                  .primaryColor
-                                  .withValues(alpha: 0.2)
-                              : Theme.of(context)
-                                  .primaryColor
-                                  .withValues(alpha: 0.08),
+                              ? Theme.of(context).primaryColor.withValues(alpha: 0.2)
+                              : Theme.of(context).primaryColor.withValues(alpha: 0.08),
                           width: 1.0),
                       boxShadow: [
                         BoxShadow(
-                          color: Theme.of(context)
-                              .shadowColor
-                              .withValues(alpha: 0.05),
+                          color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -526,18 +555,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.help_outline_rounded,
-                                size: 22, color: AppTheme.primary),
+                            Icon(Icons.help_outline_rounded, size: 22, color: AppTheme.primary),
                             const SizedBox(width: 8),
                             Text(
                               '帮助与反馈',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge
-                                    ?.color,
+                                color: Theme.of(context).textTheme.bodyLarge?.color,
                               ),
                             ),
                           ],
@@ -548,8 +573,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           child: Row(
                             children: [
                               GestureDetector(
-                                onTap: () =>
-                                    _launchUrl('https://github.com/Lonely0710'),
+                                onTap: () => _launchUrl('https://github.com/Lonely0710'),
                                 child: Image.asset(
                                   'assets/icons/ic_staff_github.png',
                                   width: 48,
@@ -558,8 +582,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               ),
                               const SizedBox(width: 8),
                               GestureDetector(
-                                onTap: () =>
-                                    _launchUrl('mailto:lingsou43@gmail.com'),
+                                onTap: () => _launchUrl('mailto:lingsou43@gmail.com'),
                                 child: Image.asset(
                                   'assets/icons/ic_staff_gmail.png',
                                   width: 48,
@@ -584,20 +607,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                    ? Theme.of(context)
-                                        .primaryColor
-                                        .withValues(alpha: 0.2)
-                                    : Theme.of(context)
-                                        .primaryColor
-                                        .withValues(alpha: 0.08),
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Theme.of(context).primaryColor.withValues(alpha: 0.2)
+                                : Theme.of(context).primaryColor.withValues(alpha: 0.08),
                             width: 1.0),
                         boxShadow: [
                           BoxShadow(
-                            color: Theme.of(context)
-                                .shadowColor
-                                .withValues(alpha: 0.05),
+                            color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -610,18 +626,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.info_outline,
-                                      size: 22, color: AppTheme.primary),
+                                  Icon(Icons.info_outline, size: 22, color: AppTheme.primary),
                                   const SizedBox(width: 8),
                                   Text(
                                     '关于我们',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
-                                      color: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.color,
+                                      color: Theme.of(context).textTheme.bodyLarge?.color,
                                     ),
                                   ),
                                 ],
@@ -633,11 +645,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                   style: TextStyle(
                                     fontFamily: 'CourierPrime',
                                     fontSize: 14,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.color
-                                        ?.withValues(alpha: 0.7),
+                                    color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
                                   ),
                                 ),
                               ),

@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../../data/auth_repository.dart';
 import '../widgets/verification_message_dialog.dart';
 import '../../../../app/animations/dialog_animations.dart';
@@ -21,8 +22,7 @@ class VerificationPage extends StatefulWidget {
 class _VerificationPageState extends State<VerificationPage> {
   final _authRepository = AuthRepository();
   // Supabase defaults to 6 digits for OTP, but user reports 8
-  final List<TextEditingController> _controllers =
-      List.generate(8, (_) => TextEditingController());
+  final List<TextEditingController> _controllers = List.generate(8, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(8, (_) => FocusNode());
 
   // Timer state
@@ -73,24 +73,11 @@ class _VerificationPageState extends State<VerificationPage> {
     try {
       await _authRepository.resendEmailOtp(email: widget.email);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Code resent!'),
-          backgroundColor: AppTheme.primary,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      AppSnackBar.showSuccess(context, '验证码已重新发送！');
       _startTimer();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to resend: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.showError(context, message: '重发失败: ${e.toString()}');
     }
   }
 
@@ -119,8 +106,7 @@ class _VerificationPageState extends State<VerificationPage> {
             barrierDismissible: false,
             builder: (context) => VerificationMessageDialog(
               status: VerificationStatus.success,
-              message:
-                  'Your account is ready to use. Please continue to set up your profile.',
+              message: '您的账号验证成功，请继续完善个人资料。',
             ),
           );
 
@@ -128,18 +114,21 @@ class _VerificationPageState extends State<VerificationPage> {
             context.go('/setup-profile');
           }
         } else {
-          throw const AuthException('Verification failed, no session created.');
+          throw const AuthException('验证失败，未创建会话。');
         }
       }
     } catch (e) {
       if (mounted) {
+        // Handle generic errors (like HandshakeException) with a user-friendly message
+        final errorMessage = e.toString().contains('HandshakeException') || e.toString().contains('SocketException')
+            ? '网络连接失败，请检查网络设置'
+            : (e is AuthException ? "验证失败: ${e.message}" : '验证码无效，请重试');
+
         await showAnimatedDialog(
           context: context,
           builder: (context) => VerificationMessageDialog(
             status: VerificationStatus.failure,
-            message: e is AuthException
-                ? e.message
-                : 'Invalid code. Please try again.',
+            message: errorMessage,
           ),
         );
       }
@@ -167,8 +156,7 @@ class _VerificationPageState extends State<VerificationPage> {
     final iconColor = isDark ? Colors.white : Colors.black;
     final titleColor = isDark ? Colors.white : Colors.black;
     final inputFillColor = isDark ? Colors.grey.shade800 : Colors.white;
-    final inputBorderColor =
-        isDark ? Colors.grey.shade700 : Colors.grey.shade200;
+    final inputBorderColor = isDark ? Colors.grey.shade700 : Colors.grey.shade200;
     final textColor = isDark ? Colors.white : AppTheme.textPrimary;
 
     return Scaffold(
@@ -181,7 +169,7 @@ class _VerificationPageState extends State<VerificationPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          "Email Verification",
+          "邮箱验证",
           style: TextStyle(
             color: titleColor,
             fontWeight: FontWeight.bold,
@@ -208,7 +196,7 @@ class _VerificationPageState extends State<VerificationPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Code has been send to ",
+                    "验证码已发送至 ",
                     style: TextStyle(
                       fontSize: 14,
                       color: textColor,
@@ -284,7 +272,7 @@ class _VerificationPageState extends State<VerificationPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Resend code in ",
+                    "重新发送 ",
                     style: TextStyle(
                       fontSize: 14,
                       color: textColor,
@@ -307,7 +295,7 @@ class _VerificationPageState extends State<VerificationPage> {
                   style: TextButton.styleFrom(
                     foregroundColor: AppTheme.primary, // Added style
                   ),
-                  child: const Text("Resend Code"),
+                  child: const Text("重新发送验证码"),
                 ),
 
               const SizedBox(height: 100),

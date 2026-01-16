@@ -16,25 +16,12 @@ class RecommendRepositoryImpl implements RecommendRepository {
 
   @override
   Future<List<Media>> getTopRatedMovies(int page) async {
-    // Fetch 2 pages to get 40 items (user wants ~33)
-    // Page 1 -> API Page 1, 2
-    // Page 2 -> API Page 3, 4
-    final apiPageStart = (page - 1) * 2 + 1;
-    final results = await Future.wait([
-      _tmdbService.getTopRatedMovies(page: apiPageStart),
-      _tmdbService.getTopRatedMovies(page: apiPageStart + 1),
-    ]);
-    return [...results[0], ...results[1]];
+    return _tmdbService.getTopRatedMovies(page: page);
   }
 
   @override
   Future<List<Media>> getTopRatedTVShows(int page) async {
-    final apiPageStart = (page - 1) * 2 + 1;
-    final results = await Future.wait([
-      _tmdbService.getTopRatedTVShows(page: apiPageStart),
-      _tmdbService.getTopRatedTVShows(page: apiPageStart + 1),
-    ]);
-    return [...results[0], ...results[1]];
+    return _tmdbService.getTopRatedTVShows(page: page);
   }
 
   @override
@@ -51,25 +38,12 @@ class RecommendRepositoryImpl implements RecommendRepository {
   @override
   Future<List<Media>> discoverMovies(int page,
       {int? year, String? genre}) async {
-    final apiPageStart = (page - 1) * 2 + 1;
-    final results = await Future.wait([
-      _tmdbService.discoverMovies(page: apiPageStart, year: year, genre: genre),
-      _tmdbService.discoverMovies(
-          page: apiPageStart + 1, year: year, genre: genre),
-    ]);
-    return [...results[0], ...results[1]];
+    return _tmdbService.discoverMovies(page: page, year: year, genre: genre);
   }
 
   @override
   Future<List<Media>> discoverTVShows(int page,
       {int? year, String? genre}) async {
-    final apiPageStart = (page - 1) * 2 + 1;
-    final results = await Future.wait([
-      _tmdbService.discoverTVShows(
-          page: apiPageStart, year: year, genre: genre),
-      _tmdbService.discoverTVShows(
-          page: apiPageStart + 1, year: year, genre: genre),
-    ]);
-    return [...results[0], ...results[1]];
+    return _tmdbService.discoverTVShows(page: page, year: year, genre: genre);
   }
 }

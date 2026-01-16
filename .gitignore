@@ -18,6 +18,9 @@ migrate_working_dir/
 *.iws
 .idea/
 
+# VSCode
+.vscode/
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
@@ -27,6 +30,11 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+macos/
+windows/
+linux/
+web/
+scripts/
 
 # Symbolication related
 app.*.symbols

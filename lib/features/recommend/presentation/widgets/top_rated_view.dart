@@ -4,6 +4,7 @@ import 'package:lottie/lottie.dart';
 import '../../../../app/animations/dialog_animations.dart';
 import '../../../../core/domain/entities/media.dart';
 import '../../../../core/presentation/widgets/app_snack_bar.dart';
+import '../../../../core/presentation/widgets/pagination_grid_view.dart';
 import '../../../../core/services/media_providers/maoyan_service.dart';
 import '../../../../core/services/media_providers/tmdb_service.dart';
 import '../../data/repositories/recommend_repository_impl.dart';
@@ -21,7 +22,7 @@ class TopRatedView extends StatefulWidget {
 
 class _TopRatedViewState extends State<TopRatedView> {
   late final RecommendRepository _repository;
-  final ScrollController _scrollController = ScrollController();
+  // final ScrollController _scrollController = ScrollController(); // Removed
 
   List<Media> _items = [];
   bool _isLoading = false;
@@ -41,29 +42,24 @@ class _TopRatedViewState extends State<TopRatedView> {
     _repository = RecommendRepositoryImpl(MaoyanService(), TmdbService());
 
     _loadData();
-    _scrollController.addListener(_onScroll);
+    // _scrollController.addListener(_onScroll); // Removed
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    // _scrollController.dispose(); // Removed
     super.dispose();
   }
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 200 &&
-        !_isLoading &&
-        _hasMore) {
-      _loadData();
-    }
-  }
+  // void _onScroll() ... // Removed
 
   Future<void> _loadData() async {
     if (_isLoading) return;
 
     if (mounted) {
-      setState(() {});
+      setState(() {
+        if (_currentPage == 1) _isLoading = true;
+      });
     }
 
     try {
@@ -91,11 +87,6 @@ class _TopRatedViewState extends State<TopRatedView> {
       // Check if we have more data
       if (newItems.isEmpty) {
         _hasMore = false;
-      }
-
-      // User requirement: Load 40 items (2 pages) but display 33 items (divisible by 3)
-      if (newItems.length > 33) {
-        newItems = newItems.take(33).toList();
       }
 
       if (mounted) {
@@ -127,9 +118,8 @@ class _TopRatedViewState extends State<TopRatedView> {
       _items = [];
       _currentPage = 1;
       _hasMore = true;
-      _hasMore = true;
     });
-    _loadData();
+    _loadData(); // Will set isLoading = true
   }
 
   void _showFilterSheet() async {
@@ -155,7 +145,6 @@ class _TopRatedViewState extends State<TopRatedView> {
         _items = [];
         _currentPage = 1;
         _hasMore = true;
-        _hasMore = true;
       });
       _loadData();
     }
@@ -178,7 +167,6 @@ class _TopRatedViewState extends State<TopRatedView> {
               _items = [];
               _currentPage = 1;
               _hasMore = true;
-              _hasMore = true;
             });
             _loadData();
           },
@@ -188,7 +176,6 @@ class _TopRatedViewState extends State<TopRatedView> {
               _items = [];
               _currentPage = 1;
               _hasMore = true;
-              _hasMore = true;
             });
             _loadData();
           },
@@ -196,51 +183,24 @@ class _TopRatedViewState extends State<TopRatedView> {
 
         // Grid Content
         Expanded(
-          child: _items.isEmpty
-              ? Center(
-                  child: Lottie.asset(
-                    'assets/lottie/movie_loading.json',
-                    width: 200,
-                    height: 200,
-                  ),
-                )
-              : NotificationListener<ScrollNotification>(
-                  onNotification: (ScrollNotification scrollInfo) {
-                    if (scrollInfo.metrics.pixels >=
-                            scrollInfo.metrics.maxScrollExtent - 200 &&
-                        !_isLoading &&
-                        _hasMore) {
-                      _loadData();
-                    }
-                    return false;
-                  },
-                  child: GridView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 0.55, // Poster ratio + text space
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
+          child: CorePaginationGridView<Media>(
+            items: _items,
+            isLoading: _isLoading && _currentPage > 1, // Loading more
+            hasMore: _hasMore,
+            onLoadMore: _loadData,
+            emptyWidget: _isLoading && _currentPage == 1
+                ? Center(
+                    child: Lottie.asset(
+                      'assets/lottie/movie_loading.json',
+                      width: 200,
+                      height: 200,
                     ),
-                    itemCount: _items.length + (_isLoading ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _items.length) {
-                        return Center(
-                          child: Lottie.asset(
-                            'assets/lottie/movie_loading.json',
-                            width: 60,
-                            height: 60,
-                          ),
-                        );
-                      }
-                      final item = _items[index];
-                      // Rank is index + 1
-                      return TopRatedItem(media: item, rank: index + 1);
-                    },
-                  ),
-                ),
+                  )
+                : null,
+            itemBuilder: (context, index, item) {
+              return TopRatedItem(media: item, rank: index + 1);
+            },
+          ),
         ),
       ],
     );

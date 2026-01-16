@@ -6,6 +6,7 @@ import '../../data/auth_repository.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/services/secure_storage_service.dart';
+import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/social_login_row.dart';
 
@@ -34,45 +35,11 @@ class _LoginPageState extends State<LoginPage> {
       await _authRepository.signInWithGithub();
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e.message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, error: e);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '登录失败，请稍后重试',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, message: '登录失败，请稍后重试');
       }
     }
   }
@@ -82,24 +49,7 @@ class _LoginPageState extends State<LoginPage> {
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '请输入账号和密码',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: AppTheme.primaryFont,
-              fontSize: 14,
-              color: Colors.white,
-            ),
-          ),
-          backgroundColor: const Color(0xFF333333),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-          margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-        ),
-      );
+      AppSnackBar.showWarning(context, '请输入邮箱和密码');
       return;
     }
 
@@ -127,45 +77,11 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e.message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, error: e);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '登录失败，请稍后重试',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, message: '登录失败，请稍后重试');
       }
     } finally {
       if (mounted) {
@@ -202,8 +118,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _checkInput() {
-    final hasInput =
-        _emailController.text.isNotEmpty && _passwordController.text.isNotEmpty;
+    final hasInput = _emailController.text.isNotEmpty && _passwordController.text.isNotEmpty;
     if (hasInput != _hasInput) {
       if (mounted) {
         setState(() {
@@ -217,8 +132,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dividerColor = isDark ? Colors.grey.shade700 : Colors.grey.shade200;
-    final secondaryTextColor =
-        isDark ? Colors.grey.shade400 : Colors.grey.shade500;
+    final secondaryTextColor = isDark ? Colors.grey.shade400 : Colors.grey.shade500;
     final titleColor = isDark ? Colors.white : AppTheme.textPrimary;
     final iconColor = isDark ? Colors.white : Colors.black;
 
@@ -255,7 +169,7 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 12),
 
                 Text(
-                  "Login to Your Account",
+                  "登录您的账号",
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -268,7 +182,7 @@ class _LoginPageState extends State<LoginPage> {
                 // Email (Use filled icon)
                 AuthTextField(
                   controller: _emailController,
-                  hintText: "Email",
+                  hintText: "邮箱",
                   prefixIcon: Icons.email, // Filled
                   keyboardType: TextInputType.emailAddress,
                 ),
@@ -278,7 +192,7 @@ class _LoginPageState extends State<LoginPage> {
                 // Password
                 AuthTextField(
                   controller: _passwordController,
-                  hintText: "Password",
+                  hintText: "密码",
                   prefixIcon: Icons.lock_rounded, // Filled rounded
                   isPassword: true,
                 ),
@@ -296,8 +210,7 @@ class _LoginPageState extends State<LoginPage> {
                         value: _reflectRememberMe,
                         activeColor: AppTheme.primary,
                         side: const BorderSide(
-                          color:
-                              AppTheme.primary, // Primary color when unchecked
+                          color: AppTheme.primary, // Primary color when unchecked
                           width: 2,
                         ),
                         shape: RoundedRectangleBorder(
@@ -312,7 +225,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      "Remember me",
+                      "记住我",
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: titleColor,
@@ -373,21 +286,19 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 12), // Reduced from 16
 
-                // Forgot Password
-                // Forgot Password
-                // TextButton(
-                //   onPressed: () {
-                //     // Forgot password
-                //   },
-                //   child: const Text(
-                //     "Forgot the password?",
-                //     style: TextStyle(
-                //       color: AppTheme.primary,
-                //       fontWeight: FontWeight.w600,
-                //       fontSize: 14,
-                //     ),
-                //   ),
-                // ),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.push('/forgot-password'),
+                    child: const Text(
+                      "忘记密码？",
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
 
                 const SizedBox(height: 24), // Reduced from 32
 
@@ -400,9 +311,7 @@ class _LoginPageState extends State<LoginPage> {
                       child: Text(
                         "or continue with",
                         style: TextStyle(
-                          color: isDark
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -420,16 +329,14 @@ class _LoginPageState extends State<LoginPage> {
                   onGooglePressed: null, // Gmail login temporarily disabled
                 ),
 
-                const SizedBox(
-                    height:
-                        24), // Reduced from 24 (keep same but bottom padding will help)
+                const SizedBox(height: 24), // Reduced from 24 (keep same but bottom padding will help)
 
                 // Sign up link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Don't have an account? ",
+                      "还没有账号？ ",
                       style: TextStyle(
                         color: secondaryTextColor,
                         fontSize: 14,
@@ -438,7 +345,7 @@ class _LoginPageState extends State<LoginPage> {
                     GestureDetector(
                       onTap: () => context.push('/register'),
                       child: const Text(
-                        "Sign up",
+                        "立即注册",
                         style: TextStyle(
                           color: AppTheme.primary,
                           fontSize: 14,

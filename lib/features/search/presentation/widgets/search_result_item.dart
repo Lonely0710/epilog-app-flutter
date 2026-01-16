@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/presentation/pages/web_browser_page.dart';
+import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../../../../features/collections/data/repositories/collection_repository_impl.dart';
 
 class SearchResultItem extends StatelessWidget {
@@ -22,8 +23,7 @@ class SearchResultItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -48,8 +48,7 @@ class SearchResultItem extends StatelessWidget {
                   width: 80,
                   height: 115,
                   color: AppColors.placeholder,
-                  child:
-                      Icon(Icons.broken_image, color: AppColors.textTertiary),
+                  child: Icon(Icons.broken_image, color: AppColors.textTertiary),
                 ),
               ),
             ),
@@ -143,8 +142,7 @@ class SearchResultItem extends StatelessWidget {
                       if (searchType == 'movie') ...[
                         Container(
                           margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppTheme.primary,
                             borderRadius: BorderRadius.circular(4),
@@ -249,17 +247,13 @@ class SearchResultItem extends StatelessWidget {
                           String url = result.sourceUrl;
                           if (url.isEmpty) {
                             if (result.sourceType == 'douban') {
-                              url =
-                                  'https://movie.douban.com/subject/${result.sourceId}';
+                              url = 'https://movie.douban.com/subject/${result.sourceId}';
                             } else if (result.sourceType == 'bgm') {
-                              url =
-                                  'https://chii.in/subject/${result.sourceId}';
+                              url = 'https://chii.in/subject/${result.sourceId}';
                             } else if (result.sourceType == 'maoyan') {
-                              url =
-                                  'https://m.maoyan.com/movie/${result.sourceId}';
+                              url = 'https://m.maoyan.com/movie/${result.sourceId}';
                             } else if (result.sourceType == 'tmdb') {
-                              url =
-                                  'https://www.themoviedb.org/${result.mediaType}/${result.sourceId}';
+                              url = 'https://www.themoviedb.org/${result.mediaType}/${result.sourceId}';
                             }
                           }
 
@@ -273,12 +267,10 @@ class SearchResultItem extends StatelessWidget {
                         },
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
-                            border:
-                                Border.all(color: AppTheme.primary, width: 1.5),
+                            border: Border.all(color: AppTheme.primary, width: 1.5),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -311,14 +303,11 @@ class SearchResultItem extends StatelessWidget {
                     // Directors
                     Row(
                       children: [
-                        Icon(Icons.videocam,
-                            size: 16, color: AppColors.textSecondary),
+                        Icon(Icons.videocam, size: 16, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            result.directors.isNotEmpty
-                                ? result.directors.join(' / ')
-                                : '暂无导演信息',
+                            result.directors.isNotEmpty ? result.directors.join(' / ') : '暂无导演信息',
                             style: const TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -333,14 +322,11 @@ class SearchResultItem extends StatelessWidget {
                     // Actors
                     Row(
                       children: [
-                        Icon(Icons.face_outlined,
-                            size: 16, color: AppColors.textSecondary),
+                        Icon(Icons.face_outlined, size: 16, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            result.actors.isNotEmpty
-                                ? result.actors.join(' / ')
-                                : '暂无演员信息',
+                            result.actors.isNotEmpty ? result.actors.join(' / ') : '暂无演员信息',
                             style: const TextStyle(
                               fontSize: 13,
                               color: Color(0xFF6B7280),
@@ -356,8 +342,7 @@ class SearchResultItem extends StatelessWidget {
                     // Anime Style (Single Line)
                     Row(
                       children: [
-                        const Icon(Icons.face_outlined,
-                            size: 16, color: Color(0xFF6B7280)),
+                        const Icon(Icons.face_outlined, size: 16, color: Color(0xFF6B7280)),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
@@ -429,8 +414,7 @@ class _CollectionStarState extends State<_CollectionStar> {
 
   Future<void> _checkStatus() async {
     try {
-      final id = await _repo.checkCollectionStatus(
-          widget.media.sourceId, widget.media.sourceType);
+      final id = await _repo.checkCollectionStatus(widget.media.sourceId, widget.media.sourceType);
       if (mounted && id != null) {
         setState(() {
           _isCollected = true;
@@ -480,7 +464,7 @@ class _CollectionStarState extends State<_CollectionStar> {
             _isCollected = false;
             _collectionId = null;
           });
-          _showSnackBar('已取消收藏', AppColors.secondary, Icons.delete_outline);
+          AppSnackBar.showInfo(context, '已从收藏中移除');
         }
       } else {
         // Toggle Add (Default Wish)
@@ -491,56 +475,15 @@ class _CollectionStarState extends State<_CollectionStar> {
             _isCollected = true;
             _collectionId = newId;
           });
-          _showSnackBar(
-              '已添加至收藏 (想看)', AppTheme.primary, Icons.check_circle_rounded);
+          AppSnackBar.showSuccess(context, '已加入想看');
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        _showSnackBar('操作失败: $e', AppTheme.error, Icons.error_outline);
+        AppSnackBar.showError(context, message: '操作失败: $e');
       }
     }
-  }
-
-  void _showSnackBar(String message, Color bgColor, IconData icon) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        content: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: bgColor.withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.textOnDark),
-              const SizedBox(width: 12),
-              Text(
-                message,
-                style: const TextStyle(
-                  color: AppColors.textOnDark,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   Color _getStatusColor() {

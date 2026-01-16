@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../../../../core/domain/entities/media.dart';
 import '../../../collections/data/repositories/collection_repository_impl.dart';
 import '../widgets/rating_display_widget.dart';
@@ -44,16 +45,13 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         await _repository.updateWatchStatus(_collectionId, status);
       } else {
         // If not collected yet, add it
-        final id =
-            await _repository.addToCollection(widget.media, status: status);
+        final id = await _repository.addToCollection(widget.media, status: status);
         _collectionId = id;
       }
     } catch (e) {
       log('Error updating status: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: $e')),
-        );
+        AppSnackBar.showError(context, message: '更新失败: $e');
       }
     }
   }
@@ -134,11 +132,8 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
   Widget _buildSliverAppBar(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
-    final textColor =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-    final buttonBg = isDark
-        ? Colors.black.withValues(alpha: 0.5)
-        : AppColors.surfaceElevated.withValues(alpha: 0.9);
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final buttonBg = isDark ? Colors.black.withValues(alpha: 0.5) : AppColors.surfaceElevated.withValues(alpha: 0.9);
 
     return SliverAppBar(
       expandedHeight: MediaQuery.of(context).size.width * 1.5,
@@ -149,8 +144,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         child: CircleAvatar(
           backgroundColor: buttonBg,
           child: IconButton(
-            icon: Icon(Icons.arrow_back,
-                color: isDark ? Colors.white : AppColors.textPrimary),
+            icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : AppColors.textPrimary),
             onPressed: () => context.pop(),
           ),
         ),
@@ -175,8 +169,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
                 ),
                 errorWidget: (context, url, error) => Container(
                   color: AppColors.surfaceDeep,
-                  child: Icon(Icons.error,
-                      color: AppColors.textOnDark.withValues(alpha: 0.5)),
+                  child: Icon(Icons.error, color: AppColors.textOnDark.withValues(alpha: 0.5)),
                 ),
               ),
             ),
@@ -207,16 +200,12 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               left: 20,
               right: 20,
               child: Text(
-                widget.media.titleOriginal.isNotEmpty
-                    ? widget.media.titleOriginal
-                    : widget.media.titleZh,
+                widget.media.titleOriginal.isNotEmpty ? widget.media.titleOriginal : widget.media.titleZh,
                 style: TextStyle(
                   fontFamily: AppTheme.primaryFont,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: isDark
-                      ? Colors.white
-                      : textColor, // Brighter in dark mode
+                  color: isDark ? Colors.white : textColor, // Brighter in dark mode
                   shadows: [
                     Shadow(
                       color: isDark ? Colors.black : AppColors.surfaceElevated,
@@ -237,25 +226,10 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     String? episodeText;
     if (widget.media.mediaType == 'anime' || widget.media.mediaType == 'tv') {
-      episodeText =
-          widget.media.duration.isNotEmpty ? widget.media.duration : '??';
-      // Removed "共" prefix logic implies just "79集" or similar
-      // If text is digit only (e.g. "79"), add "集" -> "79集"
-      // If text is "79集", keep it.
-      // User request: remove '共'.
-      // My previous logic might have added it or data has it.
-      // I will assume data might NOT have it, I construct it.
-      // If data is "24 min", I should probably not show that as episode count.
-      // NOTE: The issue "Check why no director/cast" suggests data mapping issues.
-      // For now, handling the "text" display.
+      episodeText = widget.media.duration.isNotEmpty ? widget.media.duration : '??';
       if (RegExp(r'^\d+$').hasMatch(episodeText)) {
         episodeText = '$episodeText集';
       } else {
-        // If it contains 'min', it's duration not episodes.
-        // If we don't have episode count, don't show garbage.
-        // But user wants "X集".
-        // We'll stick to displaying it if it looks reasonable or just the raw string if unsure,
-        // but ensuring no "共".
         episodeText = episodeText.replaceAll('共', '');
       }
     }
@@ -276,8 +250,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         const SizedBox(width: 8),
 
         // Movie Duration
-        if (widget.media.mediaType == 'movie' &&
-            widget.media.duration.isNotEmpty)
+        if (widget.media.mediaType == 'movie' && widget.media.duration.isNotEmpty)
           Row(
             children: [
               Icon(Icons.access_time, color: AppColors.textSecondary, size: 16),
@@ -299,9 +272,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         if (episodeText != null)
           Row(
             children: [
-              Icon(Icons.layers_outlined,
-                  color: isDark ? Colors.white : AppColors.textPrimary,
-                  size: 20),
+              Icon(Icons.layers_outlined, color: isDark ? Colors.white : AppColors.textPrimary, size: 20),
               const SizedBox(width: 4),
               Text(
                 episodeText,
@@ -403,9 +374,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.1)
-                    : Theme.of(context).cardColor,
+                color: isDark ? Colors.white.withValues(alpha: 0.1) : Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isDark
@@ -443,8 +412,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     );
   }
 
-  Widget _buildSectionWithChips(
-      String title, IconData icon, List<String> items) {
+  Widget _buildSectionWithChips(String title, IconData icon, List<String> items) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : AppColors.textPrimary;
 
@@ -483,19 +451,14 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
           runSpacing: 8,
           children: items
               .map((item) => Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.1)
-                          : Theme.of(context).cardColor,
+                      color: isDark ? Colors.white.withValues(alpha: 0.1) : Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isDark
                             ? Colors.white.withValues(alpha: 0.2)
-                            : Theme.of(context)
-                                .dividerColor
-                                .withValues(alpha: 0.5),
+                            : Theme.of(context).dividerColor.withValues(alpha: 0.5),
                       ),
                     ),
                     child: Text(

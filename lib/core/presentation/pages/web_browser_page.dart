@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 enum SiteType {
   douban,
@@ -97,6 +98,7 @@ class WebBrowserPage extends StatefulWidget {
 class _WebBrowserPageState extends State<WebBrowserPage> {
   late final WebViewController _controller;
   bool _isLoading = true;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -109,6 +111,7 @@ class _WebBrowserPageState extends State<WebBrowserPage> {
             if (mounted) {
               setState(() {
                 _isLoading = true;
+                _hasError = false;
               });
             }
           },
@@ -123,6 +126,15 @@ class _WebBrowserPageState extends State<WebBrowserPage> {
             if (mounted) {
               setState(() {
                 _isLoading = false;
+                _hasError = true;
+              });
+            }
+          },
+          onHttpError: (HttpResponseError error) {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _hasError = true;
               });
             }
           },
@@ -157,6 +169,39 @@ class _WebBrowserPageState extends State<WebBrowserPage> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
+          if (_hasError)
+            Positioned.fill(
+              child: Container(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/images/404_not_found.svg',
+                        width: 200,
+                        height: 200,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '加载失败',
+                        style: GoogleFonts.notoSans(
+                          fontSize: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          _controller.reload();
+                        },
+                        child: const Text('重试'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           if (_isLoading)
             const Center(
               child: CircularProgressIndicator(),

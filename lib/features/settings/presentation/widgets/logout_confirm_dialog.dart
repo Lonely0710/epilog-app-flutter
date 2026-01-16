@@ -22,7 +22,7 @@ class LogoutConfirmDialog extends StatelessWidget {
           children: [
             // Title
             const Text(
-              'Logout',
+              '退出登录',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -40,7 +40,7 @@ class LogoutConfirmDialog extends StatelessWidget {
             const SizedBox(height: 20),
             // Message
             Text(
-              'Are you sure you want to log out?',
+              '你是否确定退出账号？',
               style: TextStyle(
                 fontSize: 16,
                 color: textColor,
@@ -63,7 +63,7 @@ class LogoutConfirmDialog extends StatelessWidget {
                       ),
                       child: const Center(
                         child: Text(
-                          'Cancel',
+                          '取消',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -94,7 +94,7 @@ class LogoutConfirmDialog extends StatelessWidget {
                       ),
                       child: const Center(
                         child: Text(
-                          'Logout',
+                          '登出',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,

@@ -58,6 +58,37 @@ class AuthRepository {
     );
   }
 
+  Future<void> sendPasswordResetEmail({
+    required String email,
+  }) async {
+    await _auth.resetPasswordForEmail(
+      email,
+      redirectTo:
+          'epilog://reset-callback/', // Schema for deep linking if needed
+    );
+  }
+
+  Future<AuthResponse> verifyPasswordResetOtp({
+    required String email,
+    required String token,
+  }) async {
+    return await _auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.recovery,
+    );
+  }
+
+  Future<UserResponse> updatePassword({
+    required String password,
+  }) async {
+    return await _auth.updateUser(
+      UserAttributes(
+        password: password,
+      ),
+    );
+  }
+
   Future<void> signOut() async {
     await _auth.signOut();
   }

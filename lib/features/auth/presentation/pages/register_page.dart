@@ -5,6 +5,7 @@ import 'package:lottie/lottie.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/auth_repository.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/social_login_row.dart';
 
@@ -36,45 +37,11 @@ class _RegisterPageState extends State<RegisterPage> {
       await _authRepository.signInWithGithub();
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e.message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, error: e);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '登录失败，请稍后重试',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, message: '登录失败，请稍后重试');
       }
     }
   }
@@ -85,46 +52,12 @@ class _RegisterPageState extends State<RegisterPage> {
     final confirmPassword = _confirmPasswordController.text.trim();
 
     if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '请填写所有字段',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: AppTheme.primaryFont,
-              fontSize: 14,
-              color: Colors.white,
-            ),
-          ),
-          backgroundColor: const Color(0xFF333333),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-          margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-        ),
-      );
+      AppSnackBar.showWarning(context, '请填写所有字段');
       return;
     }
 
     if (password != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '两次输入的密码不一致',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: AppTheme.primaryFont,
-              fontSize: 14,
-              color: Colors.white,
-            ),
-          ),
-          backgroundColor: const Color(0xFF333333),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-          margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-        ),
-      );
+      AppSnackBar.showWarning(context, '两次输入的密码不一致');
       return;
     }
 
@@ -137,8 +70,7 @@ class _RegisterPageState extends State<RegisterPage> {
       // Using values provided by user: size=80, colors=..., variant=beam
       // We use the email prefix (username) as the name seed
       final nameSeed = email.split('@').first;
-      final avatarUrl =
-          'https://source.boringavatars.com/beam/80/$nameSeed?colors=0a0310,49007e,ff005b,ff7d10,ffb238';
+      final avatarUrl = 'https://source.boringavatars.com/beam/80/$nameSeed?colors=0a0310,49007e,ff005b,ff7d10,ffb238';
 
       // Generate random 6-digit suffix
       final random = Random();
@@ -169,45 +101,11 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e.message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, error: e);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '网络连接失败，请检查网络设置',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, message: '网络连接失败，请检查设置');
       }
     } finally {
       if (mounted) {
@@ -246,8 +144,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dividerColor = isDark ? Colors.grey.shade700 : Colors.grey.shade200;
-    final secondaryTextColor =
-        isDark ? Colors.grey.shade400 : Colors.grey.shade500;
+    final secondaryTextColor = isDark ? Colors.grey.shade400 : Colors.grey.shade500;
     final titleColor = isDark ? Colors.white : AppTheme.textPrimary;
     final iconColor = isDark ? Colors.white : Colors.black;
 
@@ -282,7 +179,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 12),
 
                 Text(
-                  "Create Your Account",
+                  "创建您的账号",
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -295,7 +192,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 // Email
                 AuthTextField(
                   controller: _emailController,
-                  hintText: "Email",
+                  hintText: "邮箱",
                   prefixIcon: Icons.email, // Filled
                   keyboardType: TextInputType.emailAddress,
                 ),
@@ -305,7 +202,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 // Password
                 AuthTextField(
                   controller: _passwordController,
-                  hintText: "Password",
+                  hintText: "密码",
                   prefixIcon: Icons.lock_rounded, // Filled rounded
                   isPassword: true,
                 ),
@@ -315,7 +212,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 // Confirm Password
                 AuthTextField(
                   controller: _confirmPasswordController,
-                  hintText: "Confirm Password",
+                  hintText: "确认密码",
                   prefixIcon: Icons.lock_rounded,
                   isPassword: true,
                 ),
@@ -348,7 +245,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      "Remember me",
+                      "记住我",
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: titleColor,
@@ -418,9 +315,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: Text(
                         "or continue with",
                         style: TextStyle(
-                          color: isDark
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -445,7 +340,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Already have an account? ",
+                      "已有账号？ ",
                       style: TextStyle(
                         color: secondaryTextColor,
                         fontSize: 14,
@@ -454,7 +349,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     GestureDetector(
                       onTap: () => context.pushReplacement('/login'),
                       child: const Text(
-                        "Sign in",
+                        "立即登录",
                         style: TextStyle(
                           color: AppTheme.primary,
                           fontSize: 14,

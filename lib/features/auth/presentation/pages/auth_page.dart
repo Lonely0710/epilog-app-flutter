@@ -4,6 +4,7 @@ import 'package:lottie/lottie.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/auth_repository.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../widgets/social_login_button.dart';
 
 class AuthPage extends StatelessWidget {
@@ -13,8 +14,7 @@ class AuthPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dividerColor = isDark ? Colors.grey.shade700 : Colors.grey.shade200;
-    final secondaryTextColor =
-        isDark ? Colors.grey.shade400 : Colors.grey.shade500;
+    final secondaryTextColor = isDark ? Colors.grey.shade400 : Colors.grey.shade500;
     final titleColor = isDark ? Colors.white : AppTheme.textPrimary;
 
     return Scaffold(
@@ -34,9 +34,9 @@ class AuthPage extends StatelessWidget {
 
               // Title
               Text(
-                "Let's you in",
+                "开启您的影视之旅",
                 style: TextStyle(
-                  fontSize: 36,
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: titleColor,
                   fontFamily: AppTheme.primaryFont,
@@ -54,15 +54,11 @@ class AuthPage extends StatelessWidget {
                     await AuthRepository().signInWithGithub();
                   } on AuthException catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(e.message)),
-                      );
+                      AppSnackBar.showError(context, error: e);
                     }
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Login failed')),
-                      );
+                      AppSnackBar.showError(context, message: '登录失败');
                     }
                   }
                 },
@@ -87,9 +83,7 @@ class AuthPage extends StatelessWidget {
                     child: Text(
                       "or",
                       style: TextStyle(
-                        color: isDark
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                       ),
@@ -116,7 +110,7 @@ class AuthPage extends StatelessWidget {
                     shadowColor: AppTheme.primary.withValues(alpha: 0.3),
                   ),
                   child: const Text(
-                    "Sign in with password",
+                    "使用密码登录",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -133,7 +127,7 @@ class AuthPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Don't have an account? ",
+                    "还没有账号？ ",
                     style: TextStyle(
                       color: secondaryTextColor,
                       fontSize: 14,
@@ -142,7 +136,7 @@ class AuthPage extends StatelessWidget {
                   GestureDetector(
                     onTap: () => context.push('/register'),
                     child: const Text(
-                      "Sign up",
+                      "立即注册",
                       style: TextStyle(
                         color: AppTheme.primary,
                         fontSize: 14,

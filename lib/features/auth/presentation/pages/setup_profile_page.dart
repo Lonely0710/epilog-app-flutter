@@ -6,9 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:avatar_plus/avatar_plus.dart';
+import 'package:flutter_notion_avatar/flutter_notion_avatar.dart';
+import 'package:flutter_notion_avatar/flutter_notion_avatar_controller.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../widgets/success_dialog.dart';
 
 class SetupProfilePage extends StatefulWidget {
@@ -24,9 +27,10 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
   // Avatar State
   final GlobalKey _avatarKey = GlobalKey();
-  String _avatarSeed = "epilog"; // Initial seed
+  NotionAvatarController? _avatarController;
   File? _localImageFile;
   bool _isUsingLocalImage = false;
+  bool _isPickingImage = false;
 
   // Existing avatar from DB
   String? _existingAvatarUrl;
@@ -51,22 +55,72 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
   }
 
   void _regenerateSeed() {
+    _avatarController?.random();
     setState(() {
-      _avatarSeed = DateTime.now().millisecondsSinceEpoch.toString();
       _isUsingLocalImage = false;
       _localImageFile = null;
     });
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-        source: ImageSource.gallery, maxWidth: 512, maxHeight: 512);
+    if (_isPickingImage) return;
 
-    if (pickedFile != null) {
+    setState(() {
+      _isPickingImage = true;
+    });
+
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: pickedFile.path,
+          maxWidth: 512,
+          maxHeight: 512,
+          compressQuality: 80,
+          compressFormat: ImageCompressFormat.jpg,
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: '裁剪头像',
+              toolbarColor: AppTheme.primary,
+              toolbarWidgetColor: Colors.white,
+              initAspectRatio: CropAspectRatioPreset.square,
+              lockAspectRatio: true,
+              hideBottomControls: true,
+              cropStyle: CropStyle.circle,
+              aspectRatioPresets: [CropAspectRatioPreset.square],
+            ),
+            IOSUiSettings(
+              title: '裁剪头像',
+              aspectRatioLockEnabled: true,
+              resetAspectRatioEnabled: false,
+              aspectRatioPickerButtonHidden: true,
+              doneButtonTitle: '完成',
+              cancelButtonTitle: '取消',
+              cropStyle: CropStyle.circle,
+              aspectRatioPresets: [CropAspectRatioPreset.square],
+            ),
+          ],
+        );
+
+        if (croppedFile != null) {
+          setState(() {
+            _localImageFile = File(croppedFile.path);
+            _isUsingLocalImage = true;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    } finally {
       setState(() {
-        _localImageFile = File(pickedFile.path);
-        _isUsingLocalImage = true;
+        _isPickingImage = false;
       });
     }
   }
@@ -79,16 +133,14 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
   Future<Uint8List?> _captureAvatarPng() async {
     try {
-      RenderRepaintBoundary? boundary = _avatarKey.currentContext
-          ?.findRenderObject() as RenderRepaintBoundary?;
+      RenderRepaintBoundary? boundary = _avatarKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) return null;
 
       // Delay slightly to ensure render
       await Future.delayed(const Duration(milliseconds: 20));
 
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (e) {
       debugPrint("Error capturing avatar: $e");
@@ -96,13 +148,11 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
     }
   }
 
-  Future<String?> _uploadFile(
-      String path, Uint8List bytes, String contentType) async {
+  Future<String?> _uploadFile(String path, Uint8List bytes, String contentType) async {
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
       final fileExt = contentType == 'image/png' ? 'png' : 'jpg';
-      final fileName =
-          '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final fileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 
       // Upload
       await Supabase.instance.client.storage.from('avatars').uploadBinary(
@@ -112,9 +162,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
           );
 
       // Get URL
-      final publicUrl = Supabase.instance.client.storage
-          .from('avatars')
-          .getPublicUrl(fileName);
+      final publicUrl = Supabase.instance.client.storage.from('avatars').getPublicUrl(fileName);
       return publicUrl;
     } catch (e) {
       debugPrint("Upload error: $e");
@@ -125,24 +173,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
   Future<void> _saveProfile() async {
     final username = _usernameController.text.trim();
     if (username.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '请输入用户名',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: AppTheme.primaryFont,
-              fontSize: 14,
-              color: Colors.white,
-            ),
-          ),
-          backgroundColor: const Color(0xFF333333),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-          margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-        ),
-      );
+      AppSnackBar.showWarning(context, '请输入昵称');
       return;
     }
 
@@ -157,15 +188,9 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
       // If using local image
       if (_isUsingLocalImage && _localImageFile != null) {
         final bytes = await _localImageFile!.readAsBytes();
-        final url =
-            await _uploadFile(_localImageFile!.path, bytes, 'image/jpeg');
+        final url = await _uploadFile(_localImageFile!.path, bytes, 'image/jpeg');
         if (url != null) finalAvatarUrl = url;
-      }
-      // If using generated avatar (and existing is null or user wants to overwrite old custom one with new generated)
-      // Limitation: We don't track if 'generated' is 'new' vs 'old'.
-      // Strategy: If _isUsingLocalImage is false, we capture whatever is on screen (AvatarPlus) and upload it.
-      // This ensures we persist the generated avatar forever.
-      else if (!_isUsingLocalImage) {
+      } else if (!_isUsingLocalImage) {
         final bytes = await _captureAvatarPng();
         if (bytes != null) {
           final url = await _uploadFile('generated.png', bytes, 'image/png');
@@ -197,24 +222,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '保存失败: $e',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: AppTheme.primaryFont,
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: const Color(0xFF333333),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-            margin: const EdgeInsets.only(bottom: 20, left: 40, right: 40),
-          ),
-        );
+        AppSnackBar.showError(context, message: '保存失败: $e');
       }
     } finally {
       if (mounted) {
@@ -272,18 +280,18 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
                           color: surfaceColor,
                           border: Border.all(color: borderColor, width: 2),
                         ),
-                        // ClipOval is essential for RepaintBoundary capture to look round?
-                        // Actually RepaintBoundary captures the widget rect.
-                        // If we want transparency outside circle, the container decoration handles clipping visually,
-                        // but the captured image will be a square with transparency corners IF container supports it.
-                        // Let's use ClipOval to be safe.
                         child: ClipOval(
                           child: _isUsingLocalImage && _localImageFile != null
                               ? Image.file(_localImageFile!, fit: BoxFit.cover)
-                              : AvatarPlus(
-                                  _avatarSeed,
-                                  height: 120,
+                              : SizedBox(
                                   width: 120,
+                                  height: 120,
+                                  child: NotionAvatar(
+                                    useRandom: true,
+                                    onCreated: (c) {
+                                      _avatarController = c;
+                                    },
+                                  ),
                                 ),
                         ),
                       ),
@@ -302,8 +310,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
                               color: AppTheme.primary,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.refresh,
-                                color: Colors.white, size: 16),
+                            child: const Icon(Icons.refresh, color: Colors.white, size: 16),
                           ),
                         ),
                       ),
@@ -327,8 +334,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.add_photo_alternate,
-                              color: AppTheme.primary, size: 20),
+                          child: const Icon(Icons.add_photo_alternate, color: AppTheme.primary, size: 20),
                         ),
                       ),
                     ),
@@ -349,9 +355,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
               Text(
                 "不管是真名还是代号，告诉我们该如何称呼你。",
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    color:
-                        isDark ? Colors.grey.shade400 : AppTheme.textSecondary),
+                style: TextStyle(color: isDark ? Colors.grey.shade400 : AppTheme.textSecondary),
               ),
               const SizedBox(height: 48),
 

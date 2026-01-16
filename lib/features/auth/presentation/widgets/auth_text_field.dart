@@ -7,6 +7,7 @@ class AuthTextField extends StatefulWidget {
   final IconData prefixIcon;
   final bool isPassword;
   final TextInputType keyboardType;
+  final ValueChanged<String>? onChanged;
 
   const AuthTextField({
     super.key,
@@ -15,6 +16,7 @@ class AuthTextField extends StatefulWidget {
     required this.prefixIcon,
     this.isPassword = false,
     this.keyboardType = TextInputType.text,
+    this.onChanged,
   });
 
   @override
@@ -73,6 +75,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
       focusNode: _focusNode,
       obscureText: widget.isPassword && _obscureText,
       keyboardType: widget.keyboardType,
+      onChanged: widget.onChanged,
       cursorColor: AppTheme.primary,
       style: TextStyle(
         fontWeight: FontWeight.w600,

@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../../domain/services/export_service.dart';
 
 class ExportDialog extends StatefulWidget {
@@ -49,9 +50,7 @@ class _ExportDialogState extends State<ExportDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出失败: $e')),
-        );
+        AppSnackBar.showError(context, message: '导出失败: $e');
       }
     } finally {
       if (mounted) {

@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:avatar_plus/avatar_plus.dart';
+import 'package:flutter_notion_avatar/flutter_notion_avatar.dart';
+import 'package:flutter_notion_avatar/flutter_notion_avatar_controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../app/theme/app_theme.dart';
 
 class SettingsAvatar extends StatelessWidget {
   final GlobalKey avatarKey;
-  final String avatarSeed;
   final String? avatarUrl;
   final bool isUsingLocalImage;
   final File? localImageFile;
@@ -17,18 +17,21 @@ class SettingsAvatar extends StatelessWidget {
   const SettingsAvatar({
     super.key,
     required this.avatarKey,
-    required this.avatarSeed,
     this.avatarUrl,
     required this.isUsingLocalImage,
     this.localImageFile,
     required this.isUploading,
     required this.onRefresh,
     required this.onPickImage,
+    this.onCreated,
   });
+
+  final ValueChanged<NotionAvatarController>? onCreated;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         RepaintBoundary(
           key: avatarKey,
@@ -38,51 +41,45 @@ class SettingsAvatar extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Theme.of(context).colorScheme.surface,
-              border: Border.all(
-                  color: Theme.of(context).scaffoldBackgroundColor, width: 3),
-              boxShadow: [
-                BoxShadow(
-                    color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-                    blurRadius: 8)
-              ],
+              border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 3),
+              boxShadow: [BoxShadow(color: Theme.of(context).shadowColor.withValues(alpha: 0.1), blurRadius: 8)],
             ),
             child: ClipOval(
               child: isUsingLocalImage && localImageFile != null
                   ? Image.file(localImageFile!, fit: BoxFit.cover)
-                  : (avatarUrl != null &&
-                          avatarUrl!.isNotEmpty &&
-                          !isUsingLocalImage
+                  : (avatarUrl != null && avatarUrl!.isNotEmpty && !isUsingLocalImage
                       ? CachedNetworkImage(
                           imageUrl: avatarUrl!,
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => AvatarPlus(
-                            avatarSeed,
-                            height: 80,
-                            width: 80,
-                          ),
                         )
-                      : AvatarPlus(avatarSeed, height: 80, width: 80)),
+                      : SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: NotionAvatar(
+                            useRandom: true,
+                            onCreated: onCreated,
+                          ),
+                        )),
             ),
           ),
         ),
         // Refresh Button
         Positioned(
-          top: 0,
-          right: 0,
+          top: -4,
+          right: -4,
           child: InkWell(
             onTap: onRefresh,
             child: Container(
               padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                  color: AppTheme.primary, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle),
               child: const Icon(Icons.refresh, color: Colors.white, size: 14),
             ),
           ),
         ),
         // Add Photo Button
         Positioned(
-          bottom: 0,
-          right: 0,
+          bottom: -4,
+          right: -4,
           child: InkWell(
             onTap: onPickImage,
             child: Container(
@@ -96,16 +93,14 @@ class SettingsAvatar extends StatelessWidget {
                     color: AppTheme.primary.withValues(alpha: 0.5),
                     width: 1.5,
                   )),
-              child: Icon(Icons.add_photo_alternate,
-                  color: AppTheme.primary, size: 16),
+              child: Icon(Icons.add_photo_alternate, color: AppTheme.primary, size: 16),
             ),
           ),
         ),
         if (isUploading)
           Positioned.fill(
             child: Center(
-              child: CircularProgressIndicator(
-                  color: Theme.of(context).primaryColor),
+              child: CircularProgressIndicator(color: Theme.of(context).primaryColor),
             ),
           ),
       ],

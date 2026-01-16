@@ -10,6 +10,9 @@ import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/verification_page.dart';
 import '../../features/auth/presentation/pages/setup_profile_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
+import '../../features/auth/presentation/pages/forgot_password/forgot_password_page.dart';
+import '../../features/auth/presentation/pages/forgot_password/forgot_password_verification_page.dart';
+import '../../features/auth/presentation/pages/forgot_password/reset_password_page.dart';
 
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/library/presentation/pages/library_page.dart';
@@ -57,6 +60,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final email = state.extra as String;
           return VerificationPage(email: email);
         },
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordPage(),
+        routes: [
+          GoRoute(
+            path: 'verify',
+            builder: (context, state) {
+              final email = state.extra as String;
+              return ForgotPasswordVerificationPage(email: email);
+            },
+          ),
+          GoRoute(
+            path: 'reset',
+            builder: (context, state) => const ResetPasswordPage(),
+          ),
+        ],
       ),
       // Push routes with SharedAxis animation
       GoRoute(

@@ -185,6 +185,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
             ? null
             : SharedAppBar(
                 title: _getTitle(widget.navigationShell.currentIndex),
+                showAvatar: widget.navigationShell.currentIndex != 3,
               ),
         body: widget.navigationShell,
         // Animated bottom navigation for immersive mode
@@ -508,13 +509,13 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
   String _getLabel(int index) {
     switch (index) {
       case 0:
-        return 'Home';
+        return '首页';
       case 1:
-        return 'Hot';
+        return '推荐';
       case 2:
-        return 'Library';
+        return '资料库';
       case 3:
-        return 'Profile';
+        return '账户';
       default:
         return '';
     }
