@@ -73,9 +73,6 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 80,
       );
 
       if (pickedFile != null) {
