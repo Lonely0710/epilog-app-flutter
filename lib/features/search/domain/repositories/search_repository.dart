@@ -1,81 +1,76 @@
-import 'dart:developer';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import '../../../../core/domain/entities/media.dart';
+import '../../../../core/services/convex_service.dart';
 
 abstract class SearchRepository {
   Future<List<Media>> searchAnime(String query);
   Future<List<Media>> searchMovie(String query);
   Future<List<Media>> searchAll(String query);
+
+  factory SearchRepository() {
+    return ConvexSearchRepositoryImpl();
+  }
 }
 
-class SearchRepositoryImpl implements SearchRepository {
-  final SupabaseClient _supabase;
-
-  SearchRepositoryImpl({SupabaseClient? supabaseClient}) : _supabase = supabaseClient ?? Supabase.instance.client;
+class ConvexSearchRepositoryImpl implements SearchRepository {
+  @override
+  Future<List<Media>> searchAnime(String query) => _searchMedia(query, 'anime');
 
   @override
-  Future<List<Media>> searchAnime(String query) async {
-    return _searchMedia(query, 'anime');
-  }
+  Future<List<Media>> searchMovie(String query) => _searchMedia(query, 'movie');
 
   @override
-  Future<List<Media>> searchMovie(String query) async {
-    return _searchMedia(query, 'movie');
-  }
+  Future<List<Media>> searchAll(String query) => _searchMedia(query, 'all');
 
-  @override
-  Future<List<Media>> searchAll(String query) async {
-    return _searchMedia(query, 'all');
-  }
-
-  /// Core method to call the search-media Edge Function
   Future<List<Media>> _searchMedia(String query, String type) async {
     if (query.isEmpty) return [];
 
     try {
-      log('Searching via Edge Function: query="$query", type="$type"');
+      final client = ConvexService.instance.client;
 
-      final response = await _supabase.functions.invoke(
-        'search-media',
-        body: {
+      final results = await client.action(
+        name: 'searchMedia:search',
+        args: {
           'query': query,
           'type': type,
         },
       );
 
-      final data = response.data;
+      final List<dynamic> list;
+      final Object rawResults = results;
 
-      if (data == null) {
-        log('Search returned null data');
+      if (rawResults is List) {
+        list = rawResults;
+      } else if (rawResults is String) {
+        try {
+          final decoded = jsonDecode(rawResults);
+          if (decoded is List) {
+            list = decoded;
+          } else {
+            return [];
+          }
+        } catch (e) {
+          return [];
+        }
+      } else {
         return [];
       }
 
-      if (data['error'] != null) {
-        log('Search error: ${data['error']}');
-        return [];
-      }
-
-      final results = data['results'] as List?;
-      if (results == null || results.isEmpty) {
-        log('No results found');
-        return [];
-      }
-
-      log('Received ${results.length} results from Edge Function');
-
-      return results
+      return list
           .map((item) {
             try {
-              return Media.fromJson(item as Map<String, dynamic>);
+              final map = Map<String, dynamic>.from(item as Map);
+              return Media.fromJson(map);
             } catch (e) {
-              log('Error parsing media item: $e');
               return null;
             }
           })
           .whereType<Media>()
           .toList();
     } catch (e) {
-      log('Search failed: $e');
+      debugPrint('❌ Repo: Convex Search failed: $e');
       return [];
     }
   }

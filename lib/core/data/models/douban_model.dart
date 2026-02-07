@@ -38,8 +38,7 @@ class DoubanModel {
   // as a data holder (POJO) that converts to Entity.
 
   // Or we can have `DoubanListItemModel` from Element.
-  factory DoubanModel.fromElement(
-      Element element, String sourceId, Map<String, String>? detailData) {
+  factory DoubanModel.fromElement(Element element, String sourceId, Map<String, String>? detailData) {
     // Basic info from element
     final titleLink = element.querySelector('h3 a');
     String titleZh = titleLink?.text.trim() ?? '未知标题';
@@ -84,8 +83,7 @@ class DoubanModel {
       releaseDate: releaseDateStr,
       duration: durationStr,
       year: yearStr,
-      directors:
-          '', // Logic to extract directors from staffStr left to toEntity or here?
+      directors: '', // Logic to extract directors from staffStr left to toEntity or here?
       // Kept simple for now, staffStr usage is dominant in current App.
       actors: '',
       staff: staffStr,
@@ -94,6 +92,7 @@ class DoubanModel {
 
   Media toEntity() {
     return Media(
+      id: '',
       sourceType: 'douban',
       sourceId: id,
       sourceUrl: 'https://movie.douban.com/subject/$id',

@@ -142,34 +142,44 @@ class RecentMovieItem extends StatelessWidget {
 
                     const SizedBox(height: 8),
 
-                    // Genres & Duration
-                    Row(
-                      children: [
-                        if (movie.genres.isNotEmpty)
-                          ...movie.genres.take(3).map((genre) => Padding(
-                                padding: const EdgeInsets.only(right: 4),
-                                child: Text(
-                                  genre,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              )),
-                        if (movie.duration.isNotEmpty && movie.duration != '0分钟')
-                          Text(
-                            movie.duration,
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).textTheme.bodySmall?.color,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: AppTheme.primaryFont),
-                          ),
-                      ],
-                    ),
+                    // Duration
+                    if (movie.duration.isNotEmpty && movie.duration != '0分钟')
+                      Text(
+                        movie.duration,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: AppTheme.primaryFont),
+                      ),
 
                     const SizedBox(height: 8),
+
+                    // Directors
+                    if (movie.directors.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.videocam_outlined,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              movie.directors.join(' / '),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(context).textTheme.bodyMedium?.color,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
 
                     // Staff / Actors
                     if (movie.actors.isNotEmpty)

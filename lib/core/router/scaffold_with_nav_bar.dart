@@ -23,14 +23,12 @@ class NavVisibilityController extends InheritedWidget {
   });
 
   static NavVisibilityController? of(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<NavVisibilityController>();
+    return context.dependOnInheritedWidgetOfExactType<NavVisibilityController>();
   }
 
   @override
   bool updateShouldNotify(NavVisibilityController oldWidget) {
-    return isNavVisible != oldWidget.isNavVisible ||
-        currentIndex != oldWidget.currentIndex;
+    return isNavVisible != oldWidget.isNavVisible || currentIndex != oldWidget.currentIndex;
   }
 }
 
@@ -44,8 +42,7 @@ class ScaffoldWithNavBar extends StatefulWidget {
   State<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
 }
 
-class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
-    with TickerProviderStateMixin {
+class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> with TickerProviderStateMixin {
   bool _isNavVisible = true;
   late AnimationController _visibilityController;
   late Animation<double> _fadeAnimation;
@@ -139,8 +136,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
     super.didUpdateWidget(oldWidget);
 
     // Animate tab change
-    if (oldWidget.navigationShell.currentIndex !=
-        widget.navigationShell.currentIndex) {
+    if (oldWidget.navigationShell.currentIndex != widget.navigationShell.currentIndex) {
       // If we have a stored drag end position, animate from there
       // The _dragEndPosition will be cleared in AnimatedBuilder after animation completes
       if (_dragEndPosition != null) {
@@ -162,9 +158,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
     }
     // When entering Library, ensure nav is visible initially (reset state)
     // User will manually trigger full screen via light cord interactions
-    if (_isLibraryPage &&
-        oldWidget.navigationShell.currentIndex != 2 &&
-        !_isNavVisible) {
+    if (_isLibraryPage && oldWidget.navigationShell.currentIndex != 2 && !_isNavVisible) {
       _setNavVisibility(true);
     }
   }
@@ -185,7 +179,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
             ? null
             : SharedAppBar(
                 title: _getTitle(widget.navigationShell.currentIndex),
-                showAvatar: widget.navigationShell.currentIndex != 3,
+                showAvatar: widget.navigationShell.currentIndex == 0 || widget.navigationShell.currentIndex == 1,
               ),
         body: widget.navigationShell,
         // Animated bottom navigation for immersive mode
@@ -215,8 +209,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
       child: Container(
         height: 64,
         decoration: BoxDecoration(
-          color:
-              isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
           borderRadius: BorderRadius.circular(32),
           boxShadow: isDark
               ? null
@@ -239,12 +232,8 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
 
             // Geometry helper calculating layout for a fractional index
             // We use a Record (dart 3) to return values
-            ({
-              double pillLeft,
-              double pillWidth,
-              List<double> itemLefts,
-              List<double> itemWidths
-            }) calculateLayout(double fractionalIndex) {
+            ({double pillLeft, double pillWidth, List<double> itemLefts, List<double> itemWidths}) calculateLayout(
+                double fractionalIndex) {
               // 1. Calculate weights for each item
               // Weight is interpolated between unselected (1.0) and selected (2.0)
               // based on distance from fractionalIndex
@@ -271,8 +260,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
               // Calculate pill geometry
               // The pill should be positioned corresponding to the fractional index.
               // We interpolate between the geometries of the floor(index) and ceil(index).
-              final lowerIndex =
-                  fractionalIndex.floor().clamp(0, itemsCount - 1);
+              final lowerIndex = fractionalIndex.floor().clamp(0, itemsCount - 1);
               final upperIndex = (lowerIndex + 1).clamp(0, itemsCount - 1);
               final t = fractionalIndex - lowerIndex;
 
@@ -309,11 +297,9 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
                 // Or dragging one "tab width" moves one tab.
                 // Avg tab width is availableWidth / 4.
                 // So delta / (availableWidth/4) = deltaIndex.
-                final deltaIndex =
-                    details.primaryDelta! / (availableWidth / itemsCount);
+                final deltaIndex = details.primaryDelta! / (availableWidth / itemsCount);
                 setState(() {
-                  _dragValue = (_dragValue! + deltaIndex)
-                      .clamp(0.0, itemsCount - 1 + 0.0);
+                  _dragValue = (_dragValue! + deltaIndex).clamp(0.0, itemsCount - 1 + 0.0);
                 });
               },
               onHorizontalDragEnd: (details) {
@@ -401,9 +387,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
                             settings: LiquidGlassSettings(
                               thickness: isDark ? 15 : 10,
                               blur: isDark ? 0 : 2,
-                              glassColor: isDark
-                                  ? const Color(0x22FFFFFF)
-                                  : Colors.white.withValues(alpha: 0.4),
+                              glassColor: isDark ? const Color(0x22FFFFFF) : Colors.white.withValues(alpha: 0.4),
                             ),
                             child: FakeGlass(
                               shape: LiquidRoundedSuperellipse(
@@ -411,10 +395,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
                               ),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: isDark
-                                      ? AppColors.primary
-                                          .withValues(alpha: 0.85)
-                                      : AppColors.primary,
+                                  color: isDark ? AppColors.primary.withValues(alpha: 0.85) : AppColors.primary,
                                   borderRadius: BorderRadius.circular(24),
                                   border: Border.all(
                                     color: isDark
@@ -424,8 +405,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.primary
-                                          .withValues(alpha: 0.3),
+                                      color: AppColors.primary.withValues(alpha: 0.3),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),

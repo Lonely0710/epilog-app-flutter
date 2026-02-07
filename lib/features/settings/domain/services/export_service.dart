@@ -1,32 +1,25 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../../../../core/domain/entities/media.dart';
-import '../../../collections/data/repositories/collection_repository_impl.dart';
+import '../../../collections/domain/repositories/collection_repository.dart';
 
 class ExportService {
-  final CollectionRepositoryImpl _repository;
+  final CollectionRepository _repository;
 
-  ExportService({CollectionRepositoryImpl? repository})
-      : _repository = repository ?? CollectionRepositoryImpl();
+  ExportService({CollectionRepository? repository}) : _repository = repository ?? CollectionRepository();
 
   Future<File> exportCollections({List<String>? mediaTypes}) async {
     // 1. Fetch Data
-    final List<Media> mediaList =
-        await _repository.getCollectedMedia(mediaTypes: mediaTypes);
+    final List<Media> mediaList = await _repository.getCollectedMedia(mediaTypes: mediaTypes);
 
     // 2. Generate CSV Content
     final StringBuffer csvBuffer = StringBuffer();
 
     // Determine which columns to show
-    final bool isAnimeOnly = mediaTypes != null &&
-        mediaTypes.length == 1 &&
-        mediaTypes.contains('anime');
+    final bool isAnimeOnly = mediaTypes != null && mediaTypes.length == 1 && mediaTypes.contains('anime');
     final bool isTvMovieOnly = mediaTypes != null &&
         !mediaTypes.contains('anime') &&
         (mediaTypes.contains('tv') || mediaTypes.contains('movie'));
-
-    // Default to "All" (mix of everything) if not strictly one category group
-    // In "All" mode, we show ALL columns.
 
     final List<String> headers = [
       'Title (CN)',
@@ -43,12 +36,7 @@ class ExportService {
       headers.addAll(['Rating (Bangumi)']);
     } else {
       // All
-      headers.addAll([
-        'Rating (Maoyan)',
-        'Rating (Douban)',
-        'Rating (IMDb)',
-        'Rating (Bangumi)'
-      ]);
+      headers.addAll(['Rating (Maoyan)', 'Rating (Douban)', 'Rating (IMDb)', 'Rating (Bangumi)']);
     }
 
     headers.addAll(['Watch Status', 'Collection Date']);
@@ -88,8 +76,7 @@ class ExportService {
 
     // 3. Save to Temp File
     final directory = await getTemporaryDirectory();
-    final String fileName =
-        'epilog_export_${DateTime.now().millisecondsSinceEpoch}.csv';
+    final String fileName = 'epilog_export_${DateTime.now().millisecondsSinceEpoch}.csv';
     final File file = File('${directory.path}/$fileName');
 
     return await file.writeAsString(csvBuffer.toString());

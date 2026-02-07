@@ -196,6 +196,7 @@ class BangumiService {
 
             if (title.isNotEmpty && id.isNotEmpty) {
               animeList.add(Media(
+                id: '',
                 sourceType: 'bgm',
                 sourceId: id,
                 sourceUrl: '$_baseUrl/subject/$id',

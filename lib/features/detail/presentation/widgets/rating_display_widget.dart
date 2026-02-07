@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/services/convex_service.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/domain/entities/media.dart';
@@ -59,28 +60,30 @@ class RatingDisplayWidget extends StatelessWidget {
         url = _constructIdUrl(siteType, media.sourceId);
       }
     }
-    // 2. Supabase match: Query media_source table
-    else if (media.sourceType == 'supabase') {
+    // 2. Convex match: Query media_sources table
+    else if (media.sourceType == 'supabase' || media.id.isNotEmpty) {
       try {
-        final client = Supabase.instance.client;
+        final sources = await ConvexService.instance.client.query(
+          'media:getMediaSources',
+          {'mediaId': media.id},
+        );
+
+        final sourceList = (sources as List).map((e) => e as Map<String, dynamic>).toList();
         final dbSourceTypes = _getDbSourceTypes(siteType);
 
-        // Query media_source using the internal media ID
-        final response = await client
-            .from('media_source')
-            .select('source_id')
-            .eq('media_id', media.sourceId)
-            .inFilter('source_type', dbSourceTypes)
-            .maybeSingle();
+        final matchedSource = sourceList.firstWhere(
+          (s) => dbSourceTypes.contains(s['sourceType']),
+          orElse: () => {},
+        );
 
-        if (response != null && response['source_id'] != null) {
-          final sourceId = response['source_id'] as String;
-          if (sourceId.isNotEmpty) {
-            url = _constructIdUrl(siteType, sourceId);
+        if (matchedSource.isNotEmpty) {
+          final sourceId = matchedSource['sourceId'];
+          if (sourceId != null && sourceId.toString().isNotEmpty) {
+            url = _constructIdUrl(siteType, sourceId.toString());
           }
         }
       } catch (e) {
-        debugPrint('Error fetching source_url: $e');
+        debugPrint('Error fetching source_url from Convex: $e');
       }
     }
 
@@ -95,10 +98,8 @@ class RatingDisplayWidget extends StatelessWidget {
   Widget _buildAnimeRating(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = Theme.of(context).cardColor;
-    final textColor =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-    final textSecondary =
-        Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey;
 
     // Premium Card Design: White background, subtle shadow, clean typography
     return Container(
@@ -165,9 +166,7 @@ class RatingDisplayWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        media.releaseDate.isNotEmpty
-                            ? media.releaseDate
-                            : 'Unknown',
+                        media.releaseDate.isNotEmpty ? media.releaseDate : 'Unknown',
                         style: TextStyle(
                           fontFamily: AppTheme.primaryFont,
                           fontSize: 18, // Slightly larger
@@ -183,9 +182,7 @@ class RatingDisplayWidget extends StatelessWidget {
                   Row(
                     children: [
                       CircularRating(
-                        rating: media.ratingBangumi > 0
-                            ? media.ratingBangumi
-                            : media.rating,
+                        rating: media.ratingBangumi > 0 ? media.ratingBangumi : media.rating,
                         size: 56,
                         strokeWidth: 4,
                         // No color passed - uses AppColors.getRatingColor() gradient
@@ -193,8 +190,7 @@ class RatingDisplayWidget extends StatelessWidget {
                       const SizedBox(width: 16),
                       // Bangumi Icon
                       GestureDetector(
-                        onTap: () =>
-                            _handleRatingTap(context, SiteType.bangumi),
+                        onTap: () => _handleRatingTap(context, SiteType.bangumi),
                         behavior: HitTestBehavior.opaque,
                         child: Opacity(
                           opacity: 0.9,
@@ -220,10 +216,8 @@ class RatingDisplayWidget extends StatelessWidget {
   Widget _buildStandardRating(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = Theme.of(context).cardColor;
-    final textColor =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-    final textSecondary =
-        Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey;
 
     final ratings = <Widget>[];
 
@@ -321,35 +315,51 @@ class RatingDisplayWidget extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Left: Release Date
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _getReleaseDateLabel(),
-                        style: TextStyle(
-                          fontFamily: AppTheme.primaryFont,
-                          fontSize: 12,
-                          color: textSecondary,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
+                  // Left: Release Date + Networks (TV only)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _getReleaseDateLabel(),
+                          style: TextStyle(
+                            fontFamily: AppTheme.primaryFont,
+                            fontSize: 12,
+                            color: textSecondary,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        media.releaseDate.isNotEmpty
-                            ? media.releaseDate
-                            : 'Unknown',
-                        style: TextStyle(
-                          fontFamily: AppTheme.primaryFont,
-                          fontSize: 18,
-                          color: textColor,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
+                        const SizedBox(height: 4),
+                        Text(
+                          media.releaseDate.isNotEmpty ? media.releaseDate : 'Unknown',
+                          style: TextStyle(
+                            fontFamily: AppTheme.primaryFont,
+                            fontSize: 18,
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
                         ),
-                      ),
-                    ],
+                        // Networks row for TV shows only
+                        if (media.mediaType == 'tv' && media.networks.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            '播出平台',
+                            style: TextStyle(
+                              fontFamily: AppTheme.primaryFont,
+                              fontSize: 12,
+                              color: textSecondary,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _buildNetworkLogos(context),
+                        ],
+                      ],
+                    ),
                   ),
 
                   // Right: All Ratings
@@ -397,10 +407,8 @@ class RatingDisplayWidget extends StatelessWidget {
     SiteType? siteType,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-    final textSecondary =
-        Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey;
 
     // Yellow rating score in dark mode as requested
     final scoreColor = isDark ? Colors.amber : textColor;
@@ -417,9 +425,7 @@ class RatingDisplayWidget extends StatelessWidget {
         alignment: Alignment.center,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: isMaoyanIcon && isDark
-              ? Colors.white.withValues(alpha: 0.9)
-              : null,
+          color: isMaoyanIcon && isDark ? Colors.white.withValues(alpha: 0.9) : null,
           border: isTmdbIcon && isDark
               ? Border.all(
                   color: Colors.white.withValues(alpha: 0.5),
@@ -427,8 +433,7 @@ class RatingDisplayWidget extends StatelessWidget {
                 )
               : null,
           borderRadius: BorderRadius.circular(6),
-          shape:
-              isMaoyanIcon && isDark ? BoxShape.rectangle : BoxShape.rectangle,
+          shape: isMaoyanIcon && isDark ? BoxShape.rectangle : BoxShape.rectangle,
         ),
         child: Image.asset(
           iconPath,
@@ -547,8 +552,7 @@ class RatingDisplayWidget extends StatelessWidget {
     // 2. If not matched, use Search URL fallback
     // This allows clicking "Maoyan" icon on a "Douban" item to search Maoyan for it.
     final query = Uri.encodeComponent(media.titleZh);
-    final queryOriginal = Uri.encodeComponent(
-        media.titleOriginal.isNotEmpty ? media.titleOriginal : media.titleZh);
+    final queryOriginal = Uri.encodeComponent(media.titleOriginal.isNotEmpty ? media.titleOriginal : media.titleZh);
 
     switch (siteType) {
       case SiteType.douban:
@@ -562,5 +566,61 @@ class RatingDisplayWidget extends StatelessWidget {
       default:
         return null;
     }
+  }
+
+  Widget _buildNetworkLogos(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: media.networks.map((network) {
+        final name = network['name'] ?? '';
+        final logoUrl = network['logoUrl'] ?? '';
+
+        if (logoUrl.isNotEmpty) {
+          return Container(
+            height: 28,
+            constraints: const BoxConstraints(maxWidth: 100),
+            child: CachedNetworkImage(
+              imageUrl: logoUrl,
+              fit: BoxFit.contain,
+              placeholder: (context, url) => Text(
+                name,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              errorWidget: (context, url, error) => Text(
+                name,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+            ),
+          );
+        } else {
+          // No logo, show name as text
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+            ),
+          );
+        }
+      }).toList(),
+    );
   }
 }

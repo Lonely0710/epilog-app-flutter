@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
+
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/auth_repository.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_snack_bar.dart';
+import '../../../../core/services/secure_storage_service.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/social_login_row.dart';
 
@@ -34,11 +34,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _handleGithubLogin() async {
     try {
-      await _authRepository.signInWithGithub();
-    } on AuthException catch (e) {
-      if (mounted) {
-        AppSnackBar.showError(context, error: e);
-      }
+      await _authRepository.signInWithOAuth('github');
     } catch (e) {
       if (mounted) {
         AppSnackBar.showError(context, message: '登录失败，请稍后重试');
@@ -66,46 +62,41 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      // Generate avatar URL
-      // Using values provided by user: size=80, colors=..., variant=beam
-      // We use the email prefix (username) as the name seed
-      final nameSeed = email.split('@').first;
-      final avatarUrl = 'https://source.boringavatars.com/beam/80/$nameSeed?colors=0a0310,49007e,ff005b,ff7d10,ffb238';
-
-      // Generate random 6-digit suffix
-      final random = Random();
-      final suffix = (random.nextInt(900000) + 100000).toString();
-      final displayName = 'epilog_$suffix';
-
-      final response = await _authRepository.signUpWithEmail(
+      // 1. Initiate Sign Up (Sends OTP if using Clerk)
+      await _authRepository.signUpWithEmail(
         email: email,
         password: password,
-        data: {
-          'avatar_url': avatarUrl,
-          'display_name': displayName,
-          'has_set_username': false,
-        },
-        emailRedirectTo: 'epilog://login-callback/',
       );
 
       if (mounted) {
-        // Check if we have a session. If so, email confirmation is disabled or auto-confirmed.
-        if (response.session != null) {
-          context.go('/home');
+        // Save credentials if "Remember Me" is checked
+        if (_reflectRememberMe) {
+          await SecureStorageService.saveCredentials(
+            email: email,
+            password: password,
+          );
         } else {
-          // No session means email confirmation is likely required.
-          if (mounted) {
-            context.push('/verification', extra: email);
-          }
+          await SecureStorageService.clearCredentials();
         }
-      }
-    } on AuthException catch (e) {
-      if (mounted) {
-        AppSnackBar.showError(context, error: e);
+
+        // 2. Navigate to Verification Page
+        if (mounted) {
+          context.push('/verification', extra: email);
+        }
       }
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, message: '网络连接失败，请检查设置');
+        final errorMessage = e.toString().toLowerCase();
+
+        if (errorMessage.contains('already') || errorMessage.contains('exists')) {
+          AppSnackBar.showWarning(context, '该邮箱已注册，请直接登录');
+        } else if (errorMessage.contains('password') && errorMessage.contains('weak')) {
+          AppSnackBar.showWarning(context, '密码强度不足，请使用更强的密码');
+        } else if (errorMessage.contains('network') || errorMessage.contains('connection')) {
+          AppSnackBar.showNetworkError(context);
+        } else {
+          AppSnackBar.showError(context, message: '注册失败: ${e.toString()}');
+        }
       }
     } finally {
       if (mounted) {

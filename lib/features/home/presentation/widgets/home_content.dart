@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../features/collections/data/repositories/collection_repository_impl.dart';
+import '../../../../features/collections/domain/repositories/collection_repository.dart';
 import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../../../../core/domain/entities/media.dart';
 import '../../../../core/services/media_providers/bangumi_service.dart';
@@ -195,14 +195,14 @@ class _HomeContentState extends ConsumerState<HomeContent> {
     );
   }
 
-  void _showCategorySheet(BuildContext context, Media media) {
+  void _showCategorySheet(BuildContext parentContext, Media media) {
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: Theme.of(sheetContext).scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.symmetric(vertical: 20),
@@ -220,22 +220,24 @@ class _HomeContentState extends ConsumerState<HomeContent> {
               ),
             ),
             _buildOption(
-              context,
+              sheetContext,
               iconWidget: Icon(Icons.movie_creation_outlined, color: AppTheme.primary, size: 20),
               label: 'Movie Library',
-              onTap: () => _addToCollection(context, media, 'movie', 'Movie Library', 'assets/icons/ic_popcorn.png'),
+              onTap: () =>
+                  _addToCollection(parentContext, media, 'movie', 'Movie Library', 'assets/icons/ic_popcorn.png'),
             ),
             _buildOption(
-              context,
+              sheetContext,
               iconWidget: Icon(Icons.tv, color: AppTheme.primary, size: 20),
               label: 'TV Show',
-              onTap: () => _addToCollection(context, media, 'tv', 'TV Show', 'assets/icons/ic_popcorn.png'),
+              onTap: () => _addToCollection(parentContext, media, 'tv', 'TV Show', 'assets/icons/ic_popcorn.png'),
             ),
             _buildOption(
-              context,
+              sheetContext,
               iconWidget: Image.asset('assets/icons/ic_bilibili.png', width: 20, height: 20),
               label: 'Anime Wall',
-              onTap: () => _addToCollection(context, media, 'anime', 'Anime Wall', 'assets/icons/ic_bilibili.png'),
+              onTap: () =>
+                  _addToCollection(parentContext, media, 'anime', 'Anime Wall', 'assets/icons/ic_bilibili.png'),
             ),
             const SizedBox(height: 10),
           ],
@@ -278,9 +280,24 @@ class _HomeContentState extends ConsumerState<HomeContent> {
     String categoryLabel,
     String iconPath,
   ) async {
-    final repo = CollectionRepositoryImpl();
+    final repo = CollectionRepository();
     try {
-      final modifiedMedia = media.copyWith(
+      var mediaToAdd = media;
+
+      // For TMDb, fetch full details to ensure we have staff/directors/etc.
+      if (media.sourceType == 'tmdb') {
+        try {
+          final fullMedia = await TmdbService().getMediaDetail(media.sourceId, media.mediaType);
+          if (fullMedia != null) {
+            mediaToAdd = fullMedia;
+          }
+        } catch (e) {
+          debugPrint('Failed to fetch full TMDb details: $e');
+          // Proceed with partial media if fetch fails
+        }
+      }
+
+      final modifiedMedia = mediaToAdd.copyWith(
         mediaType: mediaType,
       );
 
@@ -297,10 +314,11 @@ class _HomeContentState extends ConsumerState<HomeContent> {
             height: 24,
             fit: BoxFit.contain,
           ),
-          customColor: AppColors.starActive,
+          customColor: AppTheme.primary,
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('HomeContent: Failed to add to collection: $e\n$stack');
       if (context.mounted) {
         AppSnackBar.showError(context, message: '添加失败: $e');
       }

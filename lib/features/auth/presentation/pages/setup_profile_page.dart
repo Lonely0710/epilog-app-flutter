@@ -5,7 +5,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+import 'package:clerk_flutter/clerk_flutter.dart';
+import '../../../../core/services/convex_service.dart';
 import 'package:flutter_notion_avatar/flutter_notion_avatar.dart';
 import 'package:flutter_notion_avatar/flutter_notion_avatar_controller.dart';
 import 'package:image_picker/image_picker.dart';
@@ -33,7 +37,6 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
   bool _isPickingImage = false;
 
   // Existing avatar from DB
-  String? _existingAvatarUrl;
 
   @override
   void initState() {
@@ -45,12 +48,36 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
     });
   }
 
-  void _loadInitialData() {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      final metadata = user.userMetadata;
-      _usernameController.text = metadata?['display_name'] as String? ?? '';
-      _existingAvatarUrl = metadata?['avatar_url'] as String?;
+  Future<void> _loadInitialData() async {
+    // 1. Try to get from Convex (if already stored)
+    try {
+      final userJson = await ConvexService.instance.client.query(
+        'users:currentUser',
+        const <String, String>{},
+      );
+
+      final user = jsonDecode(userJson);
+
+      if (user != null) {
+        if (mounted) {
+          final userData = user as Map<String, dynamic>;
+          _usernameController.text = userData['name'] as String? ?? '';
+          // _existingAvatarUrl = userData['avatarUrl'] as String?;
+          setState(() {});
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('Convex load error: $e');
+    }
+
+    // 2. If not in Convex, try Clerk data
+    if (mounted) {
+      final clerkUser = ClerkAuth.userOf(context);
+      if (clerkUser != null) {
+        _usernameController.text = clerkUser.firstName ?? '';
+        // _existingAvatarUrl = clerkUser.imageUrl;
+      }
     }
   }
 
@@ -65,14 +92,16 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
   Future<void> _pickImage() async {
     if (_isPickingImage) return;
 
-    setState(() {
-      _isPickingImage = true;
-    });
+    if (_isPickingImage) return;
+    _isPickingImage = true;
 
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
+        requestFullMetadata: false,
+        maxWidth: 1024,
+        maxHeight: 1024,
       );
 
       if (pickedFile != null) {
@@ -116,9 +145,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
     } catch (e) {
       debugPrint('Error picking image: $e');
     } finally {
-      setState(() {
-        _isPickingImage = false;
-      });
+      _isPickingImage = false;
     }
   }
 
@@ -145,22 +172,31 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
     }
   }
 
-  Future<String?> _uploadFile(String path, Uint8List bytes, String contentType) async {
+  Future<String?> _uploadToConvex(Uint8List bytes, String contentType) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      final fileExt = contentType == 'image/png' ? 'png' : 'jpg';
-      final fileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      // 1. Generate Upload URL
+      final uploadUrlJson = await ConvexService.instance.client.mutation(
+        name: 'users:generateUploadUrl',
+        args: {},
+      );
+      final uploadUrl = jsonDecode(uploadUrlJson) as String?;
 
-      // Upload
-      await Supabase.instance.client.storage.from('avatars').uploadBinary(
-            fileName,
-            bytes,
-            fileOptions: FileOptions(contentType: contentType, upsert: true),
-          );
+      if (uploadUrl == null) throw Exception('Failed to generate upload URL');
 
-      // Get URL
-      final publicUrl = Supabase.instance.client.storage.from('avatars').getPublicUrl(fileName);
-      return publicUrl;
+      // 2. Upload File
+      final response = await http.post(
+        Uri.parse(uploadUrl),
+        headers: {'Content-Type': contentType},
+        body: bytes,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Upload failed: ${response.statusCode} ${response.body}');
+      }
+
+      // 3. Response contains storageId
+      final jsonResponse = jsonDecode(response.body);
+      return jsonResponse['storageId'];
     } catch (e) {
       debugPrint("Upload error: $e");
       return null;
@@ -179,30 +215,29 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
     });
 
     try {
-      String? finalAvatarUrl = _existingAvatarUrl;
+      String? avatarStorageId;
 
       // Handle Avatar Upload if changed
       // If using local image
       if (_isUsingLocalImage && _localImageFile != null) {
         final bytes = await _localImageFile!.readAsBytes();
-        final url = await _uploadFile(_localImageFile!.path, bytes, 'image/jpeg');
-        if (url != null) finalAvatarUrl = url;
+        avatarStorageId = await _uploadToConvex(bytes, 'image/jpeg');
       } else if (!_isUsingLocalImage) {
+        // Only upload generated avatar if we don't have an existing one OR user requested regeneration
+        // But logic here says if not using local image, we capture PNG.
         final bytes = await _captureAvatarPng();
         if (bytes != null) {
-          final url = await _uploadFile('generated.png', bytes, 'image/png');
-          if (url != null) finalAvatarUrl = url;
+          avatarStorageId = await _uploadToConvex(bytes, 'image/png');
         }
       }
 
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(
-          data: {
-            'display_name': username,
-            'avatar_url': finalAvatarUrl,
-            'has_set_username': true,
-          },
-        ),
+      // Call Convex Mutation
+      await ConvexService.instance.client.mutation(
+        name: 'users:storeUser',
+        args: {
+          'name': username,
+          if (avatarStorageId != null) 'avatarStorageId': avatarStorageId,
+        },
       );
 
       if (mounted) {
@@ -248,7 +283,11 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
           IconButton(
             icon: const Icon(Icons.logout, color: AppTheme.textSecondary),
             onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
+              try {
+                await ClerkAuth.of(context).signOut();
+              } catch (e) {
+                // Ignore
+              }
               if (!context.mounted) return;
               context.go('/login');
             },

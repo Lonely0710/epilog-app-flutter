@@ -22,8 +22,7 @@ class BangumiModel {
     required this.durationDetail,
   });
 
-  factory BangumiModel.fromElement(
-      Element item, String sourceId, Map<String, String>? detailData) {
+  factory BangumiModel.fromElement(Element item, String sourceId, Map<String, String>? detailData) {
     final titleElement = item.querySelector('h3 > a.l');
     final titleZh = titleElement?.text.trim() ?? '未知标题';
 
@@ -56,8 +55,7 @@ class BangumiModel {
       if (detailData['summary'] != null && detailData['summary']!.isNotEmpty) {
         summaryStr = detailData['summary']!;
       }
-      if (detailData['duration'] != null &&
-          detailData['duration']!.isNotEmpty) {
+      if (detailData['duration'] != null && detailData['duration']!.isNotEmpty) {
         durationStr = detailData['duration']!;
       }
     }
@@ -85,8 +83,7 @@ class BangumiModel {
       part = part.trim();
       if (RegExp(r'\d{4}年').hasMatch(part)) {
         if (RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日').hasMatch(part)) {
-          final match =
-              RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日').firstMatch(part)!;
+          final match = RegExp(r'(\d{4})年(\d{1,2})月(\d{1,2})日').firstMatch(part)!;
           final y = match.group(1)!;
           final m = match.group(2)!.padLeft(2, '0');
           final d = match.group(3)!.padLeft(2, '0');
@@ -119,6 +116,14 @@ class BangumiModel {
       }
     }
 
+    List<String> directors = [];
+    if (infoText.isNotEmpty) {
+      final firstPart = infoText.split(' / ').first.trim();
+      if (!RegExp(r'\d{4}年').hasMatch(firstPart) && !RegExp(r'\d+话').hasMatch(firstPart)) {
+        directors = [firstPart];
+      }
+    }
+
     // Override duration if detail fetch provided more info (e.g. episodes count)
     if (durationDetail.isNotEmpty) {
       duration = durationDetail; // e.g. "12集"
@@ -128,6 +133,7 @@ class BangumiModel {
     if (year.isEmpty) year = '----';
 
     return Media(
+      id: '',
       sourceType: 'bgm',
       sourceId: id,
       sourceUrl: 'https://bgm.tv/subject/$id',
@@ -140,6 +146,7 @@ class BangumiModel {
       posterUrl: poster,
       summary: summary,
       staff: staff.isEmpty ? '暂无制作信息' : staff,
+      directors: directors,
       rating: rating,
       ratingBangumi: rating,
     );

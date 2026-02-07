@@ -24,9 +24,6 @@ class ExploreSection extends StatelessWidget {
 
     final fullUrl = _buildFullUrl(randomSite, randomId, mediaType);
 
-    debugPrint(
-        'Explore: Site=${randomSite.name}, ID=$randomId, Type=$mediaType, URL=$fullUrl');
-
     context.push(
       '/webview',
       extra: WebBrowserPageArgs.fromSiteType(
@@ -117,8 +114,7 @@ class ExploreSection extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                 elevation: 4,
                 shadowColor: AppTheme.primary.withValues(alpha: 0.4),
                 shape: RoundedRectangleBorder(

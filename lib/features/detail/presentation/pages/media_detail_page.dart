@@ -6,7 +6,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../../../../core/domain/entities/media.dart';
-import '../../../collections/data/repositories/collection_repository_impl.dart';
+import '../../../collections/domain/repositories/collection_repository.dart';
 import '../widgets/rating_display_widget.dart';
 import '../widgets/watch_status_bottom_sheet.dart';
 import '../widgets/character_list_widget.dart';
@@ -22,41 +22,48 @@ class MediaDetailPage extends StatefulWidget {
 }
 
 class _MediaDetailPageState extends State<MediaDetailPage> {
-  final _repository = CollectionRepositoryImpl();
-  late bool _isCollected;
-  late String _watchStatus;
-  late String _collectionId;
+  final _repository = ConvexCollectionRepositoryImpl.instance;
+  Stream<Media?>? _mediaStream;
 
   @override
   void initState() {
     super.initState();
-    _isCollected = widget.media.isCollected;
-    _watchStatus = widget.media.watchingStatus ?? 'wish';
-    _collectionId = widget.media.collectionId;
+    _initStream();
   }
 
-  Future<void> _updateWatchStatus(String status) async {
-    // Optimistic UI: Update state immediately
-    final previousStatus = _watchStatus;
-    final previousIsCollected = _isCollected;
+  void _initStream() {
+    if (widget.media.id.isNotEmpty) {
+      _mediaStream = _repository.watchMedia(widget.media.id);
+    } else if (widget.media.sourceId.isNotEmpty && widget.media.sourceType.isNotEmpty) {
+      _mediaStream = _repository.watchMediaBySource(widget.media.sourceId, widget.media.sourceType);
+    } else {
+      // Fallback if no ID and no Source info (unlikely)
+      _mediaStream = Stream.value(widget.media);
+    }
+  }
 
-    setState(() {
-      _watchStatus = status;
-      _isCollected = true;
-    });
-
+  Future<void> _updateWatchStatus(Media currentMedia, String status) async {
     // Show feedback immediately
     if (mounted) {
       String statusText = '想看';
+      IconData statusIcon = Icons.bookmark;
+      Color statusColor = AppColors.starActive;
+
       switch (status) {
         case 'watching':
           statusText = '在看';
+          statusIcon = Icons.play_circle;
+          statusColor = Colors.blue;
           break;
         case 'watched':
           statusText = '看过';
+          statusIcon = Icons.check_circle;
+          statusColor = AppColors.success;
           break;
         case 'on_hold':
           statusText = '搁置';
+          statusIcon = Icons.pause_circle;
+          statusColor = Colors.grey;
           break;
       }
 
@@ -64,53 +71,45 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         context,
         type: SnackBarType.success,
         message: '已标记为$statusText',
-        customIcon: Icon(Icons.bookmark, color: AppColors.starActive, size: 24),
-        customColor: AppColors.starActive,
+        customIcon: Icon(statusIcon, color: statusColor, size: 24),
+        customColor: statusColor,
       );
     }
 
     try {
-      if (_collectionId.isNotEmpty) {
-        await _repository.updateWatchStatus(_collectionId, status);
+      if (currentMedia.collectionId.isNotEmpty) {
+        await _repository.updateWatchStatus(currentMedia.collectionId, status);
       } else {
         // If not collected yet, add it
-        final id = await _repository.addToCollection(widget.media, status: status);
-        if (mounted) {
-          setState(() {
-            _collectionId = id;
-          });
-        }
+        // Note: For search results, simple widget.media might lack source IDs if not parsed correctly,
+        // but we assume updated parsing logic handles it.
+        await _repository.addToCollection(widget.media, status: status);
       }
     } catch (e) {
       log('Error updating status: $e');
       if (mounted) {
-        // Revert State
-        setState(() {
-          _watchStatus = previousStatus;
-          _isCollected = previousIsCollected;
-        });
         AppSnackBar.showError(context, message: '更新失败: $e');
       }
     }
   }
 
-  void _showWatchStatusSheet() {
+  void _showWatchStatusSheet(Media currentMedia) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => WatchStatusBottomSheet(
-        media: widget.media,
-        currentStatus: _watchStatus,
+        media: currentMedia,
+        currentStatus: currentMedia.watchingStatus ?? 'wish',
         onStatusSelected: (status) {
-          _updateWatchStatus(status);
+          _updateWatchStatus(currentMedia, status);
           Navigator.pop(context);
         },
       ),
     );
   }
 
-  void _showCategorySheet() {
+  void _showCategorySheet(Media currentMedia) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -137,19 +136,21 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               context,
               iconWidget: Icon(Icons.movie_creation_outlined, color: AppTheme.primary, size: 20),
               label: 'Movie Library',
-              onTap: () => _addToCollectionWithCategory('movie', 'Movie Library', 'assets/icons/ic_popcorn.png'),
+              onTap: () =>
+                  _addToCollectionWithCategory(currentMedia, 'movie', 'Movie Library', 'assets/icons/ic_popcorn.png'),
             ),
             _buildOption(
               context,
               iconWidget: Icon(Icons.tv, color: AppTheme.primary, size: 20),
               label: 'TV Show',
-              onTap: () => _addToCollectionWithCategory('tv', 'TV Show', 'assets/icons/ic_popcorn.png'),
+              onTap: () => _addToCollectionWithCategory(currentMedia, 'tv', 'TV Show', 'assets/icons/ic_popcorn.png'),
             ),
             _buildOption(
               context,
               iconWidget: Image.asset('assets/icons/ic_bilibili.png', width: 20, height: 20),
               label: 'Anime Wall',
-              onTap: () => _addToCollectionWithCategory('anime', 'Anime Wall', 'assets/icons/ic_bilibili.png'),
+              onTap: () =>
+                  _addToCollectionWithCategory(currentMedia, 'anime', 'Anime Wall', 'assets/icons/ic_bilibili.png'),
             ),
             const SizedBox(height: 10),
           ],
@@ -185,13 +186,8 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     );
   }
 
-  Future<void> _addToCollectionWithCategory(String mediaType, String categoryLabel, String iconPath) async {
-    // Optimistic UI: Update state immediately
-    setState(() {
-      _isCollected = true;
-      _watchStatus = 'wish';
-    });
-
+  Future<void> _addToCollectionWithCategory(
+      Media currentMedia, String mediaType, String categoryLabel, String iconPath) async {
     // Show success feedback immediately
     AppSnackBar.show(
       context,
@@ -207,24 +203,48 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     );
 
     try {
-      final modifiedMedia = widget.media.copyWith(
+      // Determine preferred source type based on collection category:
+      // - movie/tv: prefer TMDB as source
+      // - anime: prefer Bangumi (bgm) as source
+      String preferredSourceType;
+      String preferredSourceId;
+      String preferredSourceUrl;
+
+      if (mediaType == 'anime') {
+        // For anime, prefer Bangumi source
+        preferredSourceType = 'bgm';
+        if (currentMedia.sourceType == 'bgm') {
+          preferredSourceId = currentMedia.sourceId;
+          preferredSourceUrl = currentMedia.sourceUrl;
+        } else {
+          // Use current source ID but with bgm sourceType (fallback assumption)
+          preferredSourceId = currentMedia.sourceId;
+          preferredSourceUrl = 'https://bgm.tv/subject_search/${Uri.encodeComponent(currentMedia.titleZh)}?cat=2';
+        }
+      } else {
+        // For movie/tv, prefer TMDB source
+        preferredSourceType = 'tmdb';
+        if (currentMedia.sourceType == 'tmdb') {
+          preferredSourceId = currentMedia.sourceId;
+          preferredSourceUrl = currentMedia.sourceUrl;
+        } else {
+          preferredSourceId = currentMedia.sourceId;
+          preferredSourceUrl = 'https://www.themoviedb.org/$mediaType/${currentMedia.sourceId}';
+        }
+      }
+
+      // Modify media with preferred source type
+      final modifiedMedia = currentMedia.copyWith(
         mediaType: mediaType,
+        sourceType: preferredSourceType,
+        sourceId: preferredSourceId,
+        sourceUrl: preferredSourceUrl,
       );
 
-      final id = await _repository.addToCollection(modifiedMedia, status: 'wish');
-      if (mounted) {
-        setState(() {
-          _collectionId = id;
-        });
-      }
+      await _repository.addToCollection(modifiedMedia, status: 'wish');
+      // No setState needed, stream will update
     } catch (e) {
       if (mounted) {
-        // Revert State
-        setState(() {
-          _isCollected = false;
-          _watchStatus = 'wish'; // or reset to previous logic if complex
-          _collectionId = '';
-        });
         AppSnackBar.showError(context, message: '添加失败: $e');
       }
     }
@@ -232,63 +252,79 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_mediaStream == null) return const Center(child: CircularProgressIndicator()); // Should not happen
+
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(context),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTitleRow(),
-                  const SizedBox(height: 24),
-                  RatingDisplayWidget(media: widget.media),
-                  const SizedBox(height: 32),
+    return StreamBuilder<Media?>(
+      stream: _mediaStream,
+      builder: (context, snapshot) {
+        // Use latest media from stream, or fallback to widget.media
+        final media = snapshot.data ?? widget.media;
 
-                  // Synopsis
-                  Text(
-                    '简介',
-                    style: TextStyle(
-                      fontFamily: AppTheme.primaryFont,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildExpandableSynopsis(widget.media.summary),
-                  const SizedBox(height: 32),
+        // If stream returned null (e.g. not found in DB), media is widget.media (uncollected)
+        // If stream returned object (found), media is that object (collected)
 
-                  // Staff / Cast
-                  if (widget.media.mediaType == 'anime') ...[
-                    _buildAnimeStaffSection(),
-                    CharacterListWidget(media: widget.media),
-                  ] else ...[
-                    if (widget.media.directors.isNotEmpty) ...[
-                      _buildDirectorsSection(),
+        final currentIsCollected = media.isCollected;
+        final currentWatchStatus = media.watchingStatus ?? 'wish';
+
+        return Scaffold(
+          backgroundColor: bgColor,
+          body: CustomScrollView(
+            slivers: [
+              _buildSliverAppBar(context, media),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTitleRow(media, currentIsCollected, currentWatchStatus),
                       const SizedBox(height: 24),
+                      RatingDisplayWidget(media: media),
+                      const SizedBox(height: 32),
+
+                      // Synopsis
+                      Text(
+                        '简介',
+                        style: TextStyle(
+                          fontFamily: AppTheme.primaryFont,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildExpandableSynopsis(media.summary),
+                      const SizedBox(height: 32),
+
+                      // Staff / Cast
+                      if (media.mediaType == 'anime') ...[
+                        _buildAnimeStaffSection(media),
+                        CharacterListWidget(media: media),
+                      ] else ...[
+                        if (media.directors.isNotEmpty) ...[
+                          _buildDirectorsSection(media),
+                          const SizedBox(height: 24),
+                        ],
+                        if (media.actors.isNotEmpty) _buildActorsSection(media),
+                      ],
+                      SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
                     ],
-                    if (widget.media.actors.isNotEmpty) _buildActorsSection(),
-                  ],
-                  SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
-                ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   // Helper methods...
 
-  Widget _buildSliverAppBar(BuildContext context) {
+  Widget _buildSliverAppBar(BuildContext context, Media media) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
     final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
@@ -314,9 +350,9 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
           fit: StackFit.expand,
           children: [
             Hero(
-              tag: widget.media.posterUrl,
+              tag: media.posterUrl,
               child: CachedNetworkImage(
-                imageUrl: widget.media.posterUrl,
+                imageUrl: media.posterUrl,
                 fit: BoxFit.cover,
                 // Ensure image covers the space completely
                 alignment: Alignment.topCenter,
@@ -359,7 +395,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
               left: 20,
               right: 20,
               child: Text(
-                widget.media.titleOriginal.isNotEmpty ? widget.media.titleOriginal : widget.media.titleZh,
+                media.titleOriginal.isNotEmpty ? media.titleOriginal : media.titleZh,
                 style: TextStyle(
                   fontFamily: AppTheme.primaryFont,
                   fontSize: 24,
@@ -381,11 +417,11 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     );
   }
 
-  Widget _buildTitleRow() {
+  Widget _buildTitleRow(Media media, bool isCollected, String watchStatus) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     String? episodeText;
-    if (widget.media.mediaType == 'anime' || widget.media.mediaType == 'tv') {
-      episodeText = widget.media.duration.isNotEmpty ? widget.media.duration : '??';
+    if (media.mediaType == 'anime' || media.mediaType == 'tv') {
+      episodeText = media.duration.isNotEmpty ? media.duration : '??';
       if (RegExp(r'^\d+$').hasMatch(episodeText)) {
         episodeText = '$episodeText集';
       } else {
@@ -397,7 +433,7 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
       children: [
         Expanded(
           child: Text(
-            widget.media.titleZh,
+            media.titleZh,
             style: TextStyle(
               fontFamily: AppTheme.primaryFont,
               fontSize: 28,
@@ -409,13 +445,13 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         const SizedBox(width: 8),
 
         // Movie Duration
-        if (widget.media.mediaType == 'movie' && widget.media.duration.isNotEmpty)
+        if (media.mediaType == 'movie' && media.duration.isNotEmpty)
           Row(
             children: [
               Icon(Icons.access_time, color: AppColors.textSecondary, size: 16),
               const SizedBox(width: 4),
               Text(
-                widget.media.duration,
+                media.duration,
                 style: TextStyle(
                   fontFamily: AppTheme.primaryFont,
                   fontSize: 14,
@@ -448,18 +484,18 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
 
         InkWell(
           onTap: () {
-            if (_isCollected) {
-              _showWatchStatusSheet();
+            if (isCollected) {
+              _showWatchStatusSheet(media);
             } else {
-              _showCategorySheet();
+              _showCategorySheet(media);
             }
           },
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(8),
             child: Icon(
-              _isCollected ? Icons.bookmark : Icons.bookmark_border,
-              color: AppColors.starActive,
+              _getStatusIcon(isCollected, watchStatus),
+              color: _getStatusColor(isCollected, watchStatus),
               size: 28,
             ),
           ),
@@ -468,13 +504,37 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     );
   }
 
-  Widget _buildAnimeStaffSection() {
+  Widget _buildAnimeStaffSection(Media media) {
     // Parse staff string: "Director Name / Original Name / Script Name"
-    final staffParts = widget.media.staff.split('/');
+    // Also handle if staff is empty or doesn't have enough parts
+    log('Building Anime Staff Section. Staff string: "${media.staff}"');
+
+    final staffParts = media.staff.split('/');
     final directorName = staffParts.isNotEmpty ? staffParts[0].trim() : '';
     final originalName = staffParts.length > 1 ? staffParts[1].trim() : '';
     final scriptName = staffParts.length > 2 ? staffParts[2].trim() : '';
     final charDesignName = staffParts.length > 3 ? staffParts[3].trim() : '';
+
+    // If parsing failed to get any meaningful names (e.g. empty string),
+    // try to fall back to the standard directors/actors lists if available.
+    if (directorName.isEmpty && originalName.isEmpty && scriptName.isEmpty && charDesignName.isEmpty) {
+      if (media.directors.isNotEmpty || media.actors.isNotEmpty) {
+        log('Staff string parsing yielded nothing, falling back to standard directors/actors.');
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (media.directors.isNotEmpty) ...[
+              _buildDirectorsSection(media),
+              const SizedBox(height: 24),
+            ],
+            if (media.actors.isNotEmpty) ...[
+              _buildActorsSection(media),
+              const SizedBox(height: 24),
+            ],
+          ],
+        );
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,10 +549,6 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
         ],
         if (scriptName.isNotEmpty) ...[
           _buildStaffSectionTitle('脚本', Icons.edit_rounded, scriptName),
-          const SizedBox(height: 16),
-        ],
-        if (charDesignName.isNotEmpty) ...[
-          _buildStaffSectionTitle('人物设定', Icons.brush_rounded, charDesignName),
           const SizedBox(height: 16),
         ],
       ],
@@ -561,19 +617,19 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
     );
   }
 
-  Widget _buildDirectorsSection() {
+  Widget _buildDirectorsSection(Media media) {
     return _buildSectionWithChips(
       '导演',
       Icons.person_rounded,
-      widget.media.directors,
+      media.directors,
     );
   }
 
-  Widget _buildActorsSection() {
+  Widget _buildActorsSection(Media media) {
     return _buildSectionWithChips(
       '主演',
       Icons.face_outlined,
-      widget.media.actors,
+      media.actors,
     );
   }
 
@@ -654,5 +710,35 @@ class _MediaDetailPageState extends State<MediaDetailPage> {
       maxLines: 6,
       overflow: TextOverflow.ellipsis,
     );
+  }
+
+  IconData _getStatusIcon(bool isCollected, String watchStatus) {
+    if (!isCollected) return Icons.bookmark_border;
+    switch (watchStatus) {
+      case 'watching':
+        return Icons.play_circle;
+      case 'watched':
+        return Icons.check_circle;
+      case 'on_hold':
+        return Icons.pause_circle;
+      case 'wish':
+      default:
+        return Icons.bookmark;
+    }
+  }
+
+  Color _getStatusColor(bool isCollected, String watchStatus) {
+    if (!isCollected) return AppColors.starActive;
+    switch (watchStatus) {
+      case 'watching':
+        return Colors.blue;
+      case 'watched':
+        return AppColors.success;
+      case 'on_hold':
+        return Colors.grey;
+      case 'wish':
+      default:
+        return AppColors.starActive;
+    }
   }
 }

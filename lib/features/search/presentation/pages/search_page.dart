@@ -29,7 +29,7 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final SearchRepository _searchRepository = SearchRepositoryImpl();
+  final SearchRepository _searchRepository = SearchRepository();
   final SearchHistoryService _historyService = SearchHistoryService();
 
   List<Media> _results = [];
@@ -319,7 +319,7 @@ class _SearchPageState extends State<SearchPage> {
             spacing: 8.0,
             runSpacing: 8.0,
             children: _history.map((item) {
-              return ActionChip(
+              return InputChip(
                 backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
                 elevation: 0,
                 side: isDark ? BorderSide(color: Colors.white.withValues(alpha: 0.1)) : BorderSide.none,
@@ -327,19 +327,19 @@ class _SearchPageState extends State<SearchPage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      item.query,
-                      style: TextStyle(color: textColor, fontSize: 13),
-                    ),
-                  ],
+                label: Text(
+                  item.query,
+                  style: TextStyle(color: textColor, fontSize: 13),
                 ),
                 onPressed: () {
                   _searchController.text = item.query;
                   _performSearch(item.query);
                 },
+                onDeleted: () async {
+                  await _historyService.deleteHistoryItem(item.query);
+                  await _loadHistory();
+                },
+                deleteIcon: Icon(Icons.close, size: 16, color: isDark ? Colors.grey[400] : Colors.grey),
               );
             }).toList(),
           ),

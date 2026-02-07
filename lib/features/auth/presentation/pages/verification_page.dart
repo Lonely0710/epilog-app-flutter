@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../../data/auth_repository.dart';
@@ -21,9 +21,9 @@ class VerificationPage extends StatefulWidget {
 
 class _VerificationPageState extends State<VerificationPage> {
   final _authRepository = AuthRepository();
-  // Supabase defaults to 6 digits for OTP, but user reports 8
-  final List<TextEditingController> _controllers = List.generate(8, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(8, (_) => FocusNode());
+  // Clerk defaults to 6 digits
+  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
 
   // Timer state
   Timer? _timer;
@@ -83,8 +83,8 @@ class _VerificationPageState extends State<VerificationPage> {
 
   Future<void> _handleVerify() async {
     final code = _controllers.map((c) => c.text).join();
-    // Check for 8 digits
-    if (code.length != 8) {
+    // Check for 6 digits
+    if (code.length != 6) {
       return;
     }
 
@@ -93,28 +93,26 @@ class _VerificationPageState extends State<VerificationPage> {
     });
 
     try {
-      final response = await _authRepository.verifyEmailOtp(
+      await _authRepository.verifyEmailOtp(
         email: widget.email,
         token: code,
       );
 
       if (mounted) {
-        if (response.session != null) {
-          // Wait for dialog to be closed
-          await showAnimatedDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => VerificationMessageDialog(
-              status: VerificationStatus.success,
-              message: '您的账号验证成功，请继续完善个人资料。',
-            ),
-          );
+        // Assuming success if no error was thrown
+        // Assuming success if no error was thrown
+        // Wait for dialog to be closed
+        await showAnimatedDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => VerificationMessageDialog(
+            status: VerificationStatus.success,
+            message: '您的账号验证成功，请继续完善个人资料。',
+          ),
+        );
 
-          if (mounted) {
-            context.go('/setup-profile');
-          }
-        } else {
-          throw const AuthException('验证失败，未创建会话。');
+        if (mounted) {
+          context.go('/setup-profile');
         }
       }
     } catch (e) {
@@ -122,7 +120,7 @@ class _VerificationPageState extends State<VerificationPage> {
         // Handle generic errors (like HandshakeException) with a user-friendly message
         final errorMessage = e.toString().contains('HandshakeException') || e.toString().contains('SocketException')
             ? '网络连接失败，请检查网络设置'
-            : (e is AuthException ? "验证失败: ${e.message}" : '验证码无效，请重试');
+            : (e.toString().contains('AuthException') ? "验证失败: ${e.toString()}" : '验证码无效，请重试');
 
         await showAnimatedDialog(
           context: context,
@@ -142,7 +140,7 @@ class _VerificationPageState extends State<VerificationPage> {
   }
 
   void _onCodeChanged(String value, int index) {
-    if (value.length == 1 && index < 7) {
+    if (value.length == 1 && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
     if (value.isEmpty && index > 0) {
@@ -218,9 +216,9 @@ class _VerificationPageState extends State<VerificationPage> {
               // Code Input
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(8, (index) {
+                children: List.generate(6, (index) {
                   return SizedBox(
-                    width: 36, // Reduced width to fits 8 items
+                    width: 44, // Increased width slightly for 6 items
                     height: 56, // Adjusted height
                     child: TextField(
                       controller: _controllers[index],

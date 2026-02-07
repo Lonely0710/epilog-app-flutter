@@ -20,7 +20,7 @@ dependencies:
   cached_network_image: ^3.3.0
   url_launcher: ^6.2.0
   lottie: ^3.3.2
-  supabase_flutter: ^2.12.0
+
 
   flutter_notion_avatar: ^0.0.5
   image_picker: ^1.2.1
@@ -35,6 +35,11 @@ dependencies:
   flutter_staggered_animations: ^1.1.1
   image_cropper: ^11.0.0
   flutter_card_swiper: ^7.2.0
+  convex_flutter: ^3.0.0
+  clerk_flutter: ^0.0.13-beta
+  clerk_auth: ^0.0.13-beta
+  flutter_dotenv: ^6.0.0
+  rxdart: ^0.28.0
 
 dev_dependencies:
   flutter_test:
@@ -53,6 +58,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - .env
     - assets/header/
     - assets/font/
     - assets/lottie/

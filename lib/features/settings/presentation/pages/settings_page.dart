@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widget_previews.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
@@ -21,9 +21,14 @@ import '../../../../core/presentation/widgets/shared_dialog_button.dart';
 import '../../../../app/theme/app_theme.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/theme_provider.dart';
+import '../../../../core/services/convex_service.dart';
+import 'package:clerk_flutter/clerk_flutter.dart';
 
 @Preview()
 Widget previewSettingsPage() => const SettingsPage();
@@ -58,13 +63,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _avatarController?.random();
   }
 
-  void _loadProfile() {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      setState(() {
-        _displayName = user.userMetadata?['display_name'] ?? 'User';
-        _avatarUrl = user.userMetadata?['avatar_url'];
-      });
+  Future<void> _loadProfile() async {
+    try {
+      final userJson = await ConvexService.instance.client.query(
+        'users:currentUser',
+        const <String, String>{},
+      );
+
+      final user = jsonDecode(userJson);
+
+      if (user != null) {
+        if (mounted) {
+          final userData = user as Map<String, dynamic>;
+          setState(() {
+            _displayName = userData['name'] as String? ?? 'User';
+            _avatarUrl = userData['avatarUrl'] as String?;
+          });
+        }
+      } else {
+        // Fallback to Clerk data if not in Convex yet
+        if (mounted) {
+          final clerkUser = ClerkAuth.userOf(context);
+          if (clerkUser != null) {
+            setState(() {
+              _displayName = clerkUser.firstName ?? 'User';
+              _avatarUrl = clerkUser.imageUrl;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading profile: $e');
     }
   }
 
@@ -72,14 +101,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _pickImage() async {
     if (_isPickingImage) return;
 
-    setState(() {
-      _isPickingImage = true;
-    });
+    if (_isPickingImage) return;
+    _isPickingImage = true;
 
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
+        requestFullMetadata: false, // Optimization: skip EXIF metadata reading
+        maxWidth: 1024,
+        maxHeight: 1024,
       );
 
       if (pickedFile != null) {
@@ -125,9 +156,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     } catch (e) {
       debugPrint('Error picking image: $e');
     } finally {
-      setState(() {
-        _isPickingImage = false;
-      });
+      _isPickingImage = false;
     }
   }
 
@@ -160,18 +189,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  Future<String?> _uploadFile(String path, Uint8List bytes, String contentType) async {
+  Future<String?> _uploadToConvex(Uint8List bytes, String contentType) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      final fileExt = contentType == 'image/png' ? 'png' : 'jpg';
-      final fileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      // 1. Generate Upload URL
+      final uploadUrlJson = await ConvexService.instance.client.mutation(
+        name: 'users:generateUploadUrl',
+        args: {},
+      );
+      final uploadUrl = jsonDecode(uploadUrlJson) as String?;
+      debugPrint('🚀 Generated Upload URL: $uploadUrl');
 
-      await Supabase.instance.client.storage.from('avatars').uploadBinary(
-            fileName,
-            bytes,
-            fileOptions: FileOptions(contentType: contentType, upsert: true),
-          );
-      return Supabase.instance.client.storage.from('avatars').getPublicUrl(fileName);
+      if (uploadUrl == null) throw Exception('Failed to generate upload URL');
+
+      // 2. Upload File
+      final response = await http.post(
+        Uri.parse(uploadUrl),
+        headers: {'Content-Type': contentType},
+        body: bytes,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Upload failed: ${response.statusCode} ${response.body}');
+      }
+
+      // 3. Response contains storageId
+      final jsonResponse = jsonDecode(response.body);
+      return jsonResponse['storageId'];
     } catch (e) {
       debugPrint("Upload error: $e");
       return null;
@@ -183,24 +226,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     setState(() => _isUploading = true);
 
     try {
-      String? newUrl;
+      String? avatarStorageId;
       if (_isUsingLocalImage && _localImageFile != null) {
         final bytes = await _localImageFile!.readAsBytes();
-        newUrl = await _uploadFile(_localImageFile!.path, bytes, 'image/jpeg');
+        avatarStorageId = await _uploadToConvex(bytes, 'image/jpeg');
       } else {
         final bytes = await _captureAvatarPng();
         if (bytes != null) {
-          newUrl = await _uploadFile('generated.png', bytes, 'image/png');
+          avatarStorageId = await _uploadToConvex(bytes, 'image/png');
         }
       }
 
-      if (newUrl != null) {
-        await Supabase.instance.client.auth.updateUser(
-          UserAttributes(data: {'avatar_url': newUrl}),
+      if (avatarStorageId != null) {
+        await ConvexService.instance.client.mutation(
+          name: 'users:storeUser',
+          args: {
+            'name': _displayName,
+            'avatarStorageId': avatarStorageId,
+          },
         );
-        setState(() => _avatarUrl = newUrl);
+
         if (mounted) {
           AppSnackBar.showSuccess(context, '头像已更新');
+          _loadProfile(); // Refresh UI to get new URL
         }
       }
     } catch (e) {
@@ -273,11 +321,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     onTap: () async {
                       final newName = controller.text.trim();
                       if (newName.isNotEmpty) {
-                        await Supabase.instance.client.auth.updateUser(
-                          UserAttributes(data: {'display_name': newName}),
-                        );
-                        setState(() => _displayName = newName);
-                        if (context.mounted) Navigator.pop(context);
+                        try {
+                          await ConvexService.instance.client.mutation(
+                            name: 'users:storeUser',
+                            args: {'name': newName},
+                          );
+                          if (mounted) {
+                            setState(() => _displayName = newName);
+                          }
+                          if (context.mounted) {
+                            AppSnackBar.showSuccess(context, '昵称已更新');
+                            Navigator.pop(context);
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            AppSnackBar.showError(context, message: '修改失败: $e');
+                          }
+                        }
                       }
                     },
                   ),
@@ -299,8 +359,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
       try {
-        await Supabase.instance.client.auth.signOut();
+        await ClerkAuth.of(context).signOut();
         if (mounted) {
           context.go('/login');
         }

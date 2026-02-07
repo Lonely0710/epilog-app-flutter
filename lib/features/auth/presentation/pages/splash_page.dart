@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../data/auth_repository.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -23,26 +23,10 @@ class _SplashPageState extends State<SplashPage> {
 
     if (!mounted) return;
 
-    final session = Supabase.instance.client.auth.currentSession;
+    final isAuthenticated = AuthRepository().isAuthenticated;
 
-    if (session != null) {
-      try {
-        // Validate session against server to ensure user wasn't deleted
-        await Supabase.instance.client.auth.getUser();
-        if (mounted) {
-          context.go('/home');
-        }
-      } catch (e) {
-        // If getUser fails (e.g. user deleted), sign out and go to login
-        try {
-          await Supabase.instance.client.auth.signOut();
-        } catch (_) {
-          // Ignore signOut errors (e.g. network issues)
-        }
-        if (mounted) {
-          context.go('/auth');
-        }
-      }
+    if (isAuthenticated) {
+      context.go('/home');
     } else {
       context.go('/auth');
     }
@@ -104,9 +88,7 @@ class _SplashPageState extends State<SplashPage> {
                         style: TextStyle(
                           fontFamily: 'FangZheng',
                           fontSize: 24,
-                          color: isDark
-                              ? Colors.white
-                              : const Color.fromARGB(255, 108, 114, 128),
+                          color: isDark ? Colors.white : const Color.fromARGB(255, 108, 114, 128),
                           height: 1.0,
                         ),
                       ),

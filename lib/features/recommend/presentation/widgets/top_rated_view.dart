@@ -22,7 +22,6 @@ class TopRatedView extends StatefulWidget {
 
 class _TopRatedViewState extends State<TopRatedView> {
   late final RecommendRepository _repository;
-  // final ScrollController _scrollController = ScrollController(); // Removed
 
   List<Media> _items = [];
   bool _isLoading = false;
@@ -42,16 +41,12 @@ class _TopRatedViewState extends State<TopRatedView> {
     _repository = RecommendRepositoryImpl(MaoyanService(), TmdbService());
 
     _loadData();
-    // _scrollController.addListener(_onScroll); // Removed
   }
 
   @override
   void dispose() {
-    // _scrollController.dispose(); // Removed
     super.dispose();
   }
-
-  // void _onScroll() ... // Removed
 
   Future<void> _loadData() async {
     if (_isLoading) return;
@@ -70,15 +65,13 @@ class _TopRatedViewState extends State<TopRatedView> {
 
       if (_currentType == '电影') {
         if (_selectedYear != null || _selectedGenre != null) {
-          newItems = await _repository.discoverMovies(_currentPage,
-              year: _selectedYear, genre: _selectedGenre);
+          newItems = await _repository.discoverMovies(_currentPage, year: _selectedYear, genre: _selectedGenre);
         } else {
           newItems = await _repository.getTopRatedMovies(_currentPage);
         }
       } else {
         if (_selectedYear != null || _selectedGenre != null) {
-          newItems = await _repository.discoverTVShows(_currentPage,
-              year: _selectedYear, genre: _selectedGenre);
+          newItems = await _repository.discoverTVShows(_currentPage, year: _selectedYear, genre: _selectedGenre);
         } else {
           newItems = await _repository.getTopRatedTVShows(_currentPage);
         }

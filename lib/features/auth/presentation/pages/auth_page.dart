@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../data/auth_repository.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_snack_bar.dart';
@@ -51,11 +51,7 @@ class AuthPage extends StatelessWidget {
                 iconPath: 'assets/icons/ic_github.svg',
                 onPressed: () async {
                   try {
-                    await AuthRepository().signInWithGithub();
-                  } on AuthException catch (e) {
-                    if (context.mounted) {
-                      AppSnackBar.showError(context, error: e);
-                    }
+                    await AuthRepository().signInWithOAuth('github');
                   } catch (e) {
                     if (context.mounted) {
                       AppSnackBar.showError(context, message: '登录失败');

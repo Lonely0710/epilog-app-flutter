@@ -1,7 +1,7 @@
 import 'dart:developer';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/convex_service.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/domain/entities/character.dart';
 import '../../../../core/domain/entities/media.dart';
@@ -20,7 +20,6 @@ class _CharacterListWidgetState extends State<CharacterListWidget> {
   final _bangumiService = BangumiService();
   List<Character> _characters = [];
   bool _isLoading = true;
-  String? _error;
 
   @override
   void initState() {
@@ -35,32 +34,29 @@ class _CharacterListWidgetState extends State<CharacterListWidget> {
     if (widget.media.sourceType == 'bgm' && widget.media.sourceId.isNotEmpty) {
       sourceId = widget.media.sourceId;
     } else {
-      // 2. If not, try to find it via media_source table (User Instruction)
-      // We need a way to link to media_id.
-      // Using collectionId if available is one path.
-      if (widget.media.collectionId.isNotEmpty) {
+      // 2. If not, try to find it via media_sources table (Convex)
+      if (widget.media.collectionId.isNotEmpty || widget.media.id.isNotEmpty) {
         try {
-          final supabase = Supabase.instance.client;
-          // Get media_id from collection
-          final collectionRes =
-              await supabase.from('collections').select('media_id').eq('id', widget.media.collectionId).maybeSingle();
+          // Use the Convex query we just added
+          final sources = await ConvexService.instance.client.query(
+            'media:getMediaSources',
+            {'mediaId': widget.media.id},
+          );
 
-          if (collectionRes != null) {
-            final mediaId = collectionRes['media_id'];
-            // Get source_id from media_source
-            final sourceRes = await supabase
-                .from('media_source')
-                .select('source_id')
-                .eq('media_id', mediaId)
-                .eq('source_type', 'bgm')
-                .maybeSingle();
+          final sourceList = (sources as List).map((e) => e as Map<String, dynamic>).toList();
+          final bgmSource = sourceList.firstWhere(
+            (s) => s['sourceType'] == 'bgm',
+            orElse: () => {},
+          );
 
-            if (sourceRes != null) {
-              sourceId = sourceRes['source_id'];
+          if (bgmSource.isNotEmpty) {
+            final sId = bgmSource['sourceId'];
+            if (sId != null && sId.toString().isNotEmpty) {
+              sourceId = sId.toString();
             }
           }
         } catch (e) {
-          log('Error resolving BGM ID from DB: $e');
+          log('Error resolving BGM ID from Convex: $e');
         }
       }
     }
@@ -87,7 +83,6 @@ class _CharacterListWidgetState extends State<CharacterListWidget> {
       log('Error loading characters: $e');
       if (mounted) {
         setState(() {
-          _error = '加载失败';
           _isLoading = false;
         });
       }
@@ -140,7 +135,7 @@ class _CharacterListWidgetState extends State<CharacterListWidget> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 220, // Adjust height based on card size
+          height: 250,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             scrollDirection: Axis.horizontal,
@@ -185,9 +180,10 @@ class _CharacterListWidgetState extends State<CharacterListWidget> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: CachedNetworkImage(
               imageUrl: char.imageUrl,
-              height: 140, // Taller image
+              height: 160, // Taller image (3:4 ratio with width 120)
               width: 120,
               fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
               placeholder: (context, url) => Container(
                 color: isDark ? Colors.grey[800] : Colors.grey[200],
               ),

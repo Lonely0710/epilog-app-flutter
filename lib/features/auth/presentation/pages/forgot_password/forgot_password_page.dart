@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../data/auth_repository.dart';
 import '../../../../../app/theme/app_theme.dart';
@@ -51,13 +50,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       if (mounted) {
         context.push('/forgot-password/verify', extra: email);
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        AppSnackBar.showError(context, error: e);
-      }
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, message: '发送重置邮件失败，请重试');
+        AppSnackBar.showError(context, message: '发送重置邮件失败: ${e.toString()}');
       }
     } finally {
       if (mounted) {

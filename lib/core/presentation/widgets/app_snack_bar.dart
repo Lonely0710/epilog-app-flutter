@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../app/theme/app_colors.dart';
 
 enum SnackBarType { success, error, warning, info }
@@ -11,14 +11,15 @@ class AppSnackBar {
   static String _getFriendlyMessage(dynamic error, String? customMessage) {
     if (customMessage != null && customMessage.isNotEmpty) return customMessage;
 
-    if (error is AuthException) {
-      if (error.message.contains('Invalid login credentials')) {
+    if (error != null) {
+      final errorStr = error.toString().toLowerCase();
+      if (errorStr.contains('invalid login credentials')) {
         return '邮箱或密码错误，请重试。';
       }
-      if (error.message.contains('User already exists')) {
+      if (errorStr.contains('user already exists')) {
         return '该邮箱已注册，请直接登录。';
       }
-      if (error.message.contains('Email not confirmed')) {
+      if (errorStr.contains('email not confirmed')) {
         return '登录前请先确认您的邮箱。';
       }
       return error.message;

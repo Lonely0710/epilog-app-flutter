@@ -21,6 +21,9 @@ migrate_working_dir/
 # VSCode
 .vscode/
 
+# npm
+node_modules/
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
@@ -47,3 +50,4 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .env
+.env.local

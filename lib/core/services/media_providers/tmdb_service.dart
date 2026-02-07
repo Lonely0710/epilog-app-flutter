@@ -1,5 +1,6 @@
 import 'dart:developer';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+import '../../services/convex_service.dart';
 import '../../domain/entities/media.dart';
 import '../../data/models/tmdb_model.dart';
 
@@ -97,6 +98,13 @@ class TmdbService {
     );
   }
 
+  /// Helper to construct path with query parameters
+  String _buildPathWithQuery(String path, Map<String, String>? query) {
+    if (query == null || query.isEmpty) return path;
+    final queryString = Uri(queryParameters: query).query;
+    return '$path?$queryString';
+  }
+
   /// Core method to call Supabase Edge Function
   Future<List<Media>> _invokeProxyList({
     required String path,
@@ -107,17 +115,18 @@ class TmdbService {
     bool fetchDetails = false,
   }) async {
     try {
-      final response = await Supabase.instance.client.functions.invoke(
-        'tmdb-proxy',
-        body: {
-          'path': path,
-          'query': query,
+      final fullPath = _buildPathWithQuery(path, query);
+      log('TMDb Proxy Call: $fullPath');
+
+      final response = await ConvexService.instance.client.action(
+        name: 'tmdbProxy:proxy',
+        args: {
+          'path': fullPath,
+          // 'query': query, // Pass null or empty map as we encoded it in path
         },
       );
 
-      // Edge Function returns { data: ... } or direct array depending on implementation
-      // Our function returns standard TMDb JSON structure directly
-      final data = response.data;
+      final data = jsonDecode(response);
 
       if (data['results'] == null) {
         log('TMDb Proxy Error: No results found in response');
@@ -156,27 +165,76 @@ class TmdbService {
     }
   }
 
+  Future<Media?> getMediaDetail(String id, String type) async {
+    return _fetchDetailViaProxy({'id': id, 'media_type': type});
+  }
+
   Future<Media?> _fetchDetailViaProxy(Map<String, dynamic> item) async {
     try {
       final mediaType = item['media_type'];
-      final id = item['id'].toString();
+      // Clean ID: ensure no '.0' suffix
+      final rawId = item['id'];
+      String id;
+      if (rawId is double) {
+        id = rawId.toInt().toString();
+      } else if (rawId is int) {
+        id = rawId.toString();
+      } else {
+        id = rawId.toString().replaceAll('.0', '');
+      }
 
-      final response = await Supabase.instance.client.functions.invoke(
-        'tmdb-proxy',
-        body: {
-          'path': '/$mediaType/$id',
-          'query': {
-            'language': 'zh-CN',
-            'append_to_response': 'credits',
-          }
+      log('TMDb Detail Fetch: type=$mediaType, id=$id');
+
+      final queryParams = {
+        'language': 'zh-CN',
+        'append_to_response': 'credits,aggregate_credits,keywords,images',
+      };
+
+      final fullPath = _buildPathWithQuery('/$mediaType/$id', queryParams);
+      log('TMDb Detail Fetch Path: $fullPath');
+
+      final response = await ConvexService.instance.client.action(
+        name: 'tmdbProxy:proxy',
+        args: {
+          'path': fullPath,
         },
       );
 
-      final detailData = response.data;
+      // Convex action returns a JSON string, decode it
+      // log('TMDb Detail Fetch: Raw response type: ${response.runtimeType}');
+      final detailData = jsonDecode(response) as Map<String, dynamic>;
+
+      // log('TMDb Detail Fetch: Response keys: ${detailData.keys.toList()}');
+
+      // Debug: Check if credits exist in response
+      if (detailData.containsKey('credits')) {
+        log('TMDb Detail Fetch: Credits found for $id');
+        final credits = detailData['credits'];
+        if (credits is Map) {
+          if (credits['crew'] != null) {
+            log('TMDb Detail Fetch: Crew count = ${(credits['crew'] as List).length}');
+          }
+          if (credits['cast'] != null) {
+            log('TMDb Detail Fetch: Cast count = ${(credits['cast'] as List).length}');
+          }
+        } else {
+          log('TMDb Detail Fetch: Credits is not a Map: $credits');
+        }
+      } else if (detailData.containsKey('aggregate_credits')) {
+        log('TMDb Detail Fetch: Aggregate Credits found for $id');
+      } else {
+        log('TMDb Detail Fetch: NO credits in response for $id. Available keys: ${detailData.keys.toList()}');
+      }
+
       final model = TmdbModel.fromJson(detailData, mediaType);
-      return model.toEntity();
-    } catch (e) {
-      log('Error fetching details via proxy for ${item['id']}: $e');
+      final entity = model.toEntity();
+
+      // Debug: Check parsed entity
+      log('TMDb Parsed: directors=${entity.directors}, actors=${entity.actors}, staff=${entity.staff}');
+
+      return entity;
+    } catch (e, stack) {
+      log('Error fetching details via proxy for ${item['id']}: $e\n$stack');
       // Fallback to basic info if detail fetch fails
       try {
         final model = TmdbModel.fromJson(item, item['media_type']);

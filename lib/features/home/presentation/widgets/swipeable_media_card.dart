@@ -71,6 +71,30 @@ class SwipeableMediaCard extends StatelessWidget {
                 child: _buildReleaseDateSeal(media.releaseDate),
               ),
 
+            // TMDb Media Type Badge (TV/MOVIE)
+            if (media.sourceType == 'tmdb')
+              Positioned(
+                top: 24,
+                right: 24,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  ),
+                  child: Text(
+                    media.mediaType == 'tv' ? 'TV' : 'MOVIE',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+
             // Swipe Indicators
             _buildSwipeIndicators(),
 
@@ -157,7 +181,7 @@ class SwipeableMediaCard extends StatelessWidget {
           child: _buildIndicator(
             icon: Icons.check_circle,
             color: Colors.white,
-            backgroundColor: AppColors.starActive,
+            backgroundColor: AppColors.success, // Changed to Green
             text: '加入想看',
           ),
         ),
@@ -177,7 +201,7 @@ class SwipeableMediaCard extends StatelessWidget {
           child: _buildIndicator(
             icon: Icons.cancel,
             color: Colors.white,
-            backgroundColor: Colors.grey,
+            backgroundColor: AppColors.error, // Changed to Red
             text: '不感兴趣',
           ),
         ),
@@ -202,7 +226,7 @@ class SwipeableMediaCard extends StatelessWidget {
             child: _buildIndicator(
               icon: Icons.cancel,
               color: Colors.white,
-              backgroundColor: Colors.grey,
+              backgroundColor: AppColors.error, // Changed to Red
               text: '不感兴趣',
             ),
           ),
@@ -225,7 +249,7 @@ class SwipeableMediaCard extends StatelessWidget {
             child: _buildIndicator(
               icon: Icons.cancel,
               color: Colors.white,
-              backgroundColor: Colors.grey,
+              backgroundColor: AppColors.error, // Changed to Red
               text: '不感兴趣',
             ),
           ),

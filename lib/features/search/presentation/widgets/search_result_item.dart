@@ -9,7 +9,8 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/presentation/pages/web_browser_page.dart';
 import '../../../../core/presentation/widgets/app_snack_bar.dart';
-import '../../../../features/collections/data/repositories/collection_repository_impl.dart';
+import '../../../../features/collections/domain/repositories/collection_repository.dart';
+import '../../../../core/services/media_providers/tmdb_service.dart';
 
 class SearchResultItem extends StatelessWidget {
   final Media result;
@@ -269,24 +270,88 @@ class SearchResultItem extends StatelessWidget {
 
                   // Staff Information
                   if (result.mediaType == 'anime') ...[
-                    // Anime Style (Single Line)
+                    // Anime Style: Smart Display
+                    // Row 1: Director
+                    // Anime Style: Smart Display
+                    // Row 1: Director & Original Work
                     Row(
                       children: [
-                        const Icon(Icons.face_outlined, size: 16, color: Color(0xFF6B7280)),
+                        const Icon(Icons.videocam_outlined, size: 16, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            result.staff.isNotEmpty ? result.staff : '暂无制作信息',
+                            () {
+                              List<String> parts = [];
+                              // Directors
+                              if (result.directors.isNotEmpty) {
+                                parts.add('导演: ${result.directors.join('/')}');
+                              }
+                              // Original Work from staff string
+                              final originalMatch = RegExp(r'原作[:：]\s*([^/]+)').firstMatch(result.staff);
+                              if (originalMatch != null) {
+                                parts.add('原作: ${originalMatch.group(1)?.trim()}');
+                              }
+
+                              if (parts.isNotEmpty) return parts.join(' / ');
+
+                              // Fallback
+                              return result.staff.isNotEmpty ? result.staff : '暂无制作信息';
+                            }(),
                             style: const TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF6B7280),
+                              color: AppColors.textSecondary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
-                    )
+                    ),
+                    const SizedBox(height: 4),
+                    // Row 2: CV / Actors (演出)
+                    if (result.actors.isNotEmpty)
+                      Row(
+                        children: [
+                          const Icon(Icons.mic_none_outlined,
+                              size: 16, color: AppColors.textSecondary), // Mic icon for CV
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'CV: ${result.actors.join(' / ')}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF6B7280),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      )
+                    else if (result.staff.isNotEmpty && !result.staff.contains('原作') && result.directors.isEmpty)
+                      if (result.staff.contains('脚本'))
+                        Row(
+                          children: [
+                            const Icon(Icons.description_outlined, size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                () {
+                                  final match = RegExp(r'脚本[:：]\s*([^/]+)').firstMatch(result.staff);
+                                  return match != null ? '脚本: ${match.group(1)?.trim()}' : '';
+                                }(),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        const SizedBox.shrink(),
                   ] else ...[
                     // Movie/TV Style (Two Lines)
                     // Directors
@@ -307,8 +372,6 @@ class SearchResultItem extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        // If we are in the else block and there are no actors, showing the star here might be good?
-                        // But we plan to show actors line below.
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -442,7 +505,7 @@ class _CollectionStar extends StatefulWidget {
 class _CollectionStarState extends State<_CollectionStar> {
   bool _isCollected = false;
   String? _collectionId;
-  final _repo = CollectionRepositoryImpl();
+  final _repo = CollectionRepository();
 
   @override
   void initState() {
@@ -479,24 +542,16 @@ class _CollectionStarState extends State<_CollectionStar> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        width: 86,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        width: 80,
+        padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
-          color: _isCollected ? AppTheme.primary : AppTheme.primary.withValues(alpha: 0.05),
+          color: _isCollected ? Colors.transparent : AppTheme.primary.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: _isCollected ? Colors.transparent : AppTheme.primary.withValues(alpha: 0.6),
+            color: _isCollected ? AppColors.starActive : AppTheme.primary.withValues(alpha: 0.6),
             width: 1.5,
           ),
-          boxShadow: _isCollected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : null,
+          boxShadow: null, // Remove shadow for cleaner outline look
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -506,14 +561,14 @@ class _CollectionStarState extends State<_CollectionStar> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: _isCollected ? Colors.white : AppTheme.primary,
+                color: _isCollected ? AppColors.starActive : AppTheme.primary,
                 letterSpacing: 1,
               ),
             ),
             const SizedBox(width: 4),
             Icon(
               _isCollected ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-              color: _isCollected ? Colors.white : AppTheme.primary,
+              color: _isCollected ? AppColors.starActive : AppTheme.primary,
               size: 18,
             ),
           ],
@@ -649,10 +704,68 @@ class _CollectionStarState extends State<_CollectionStar> {
     );
 
     try {
-      // modify media type
-      final modifiedMedia = widget.media.copyWith(
+      // Determine preferred source type based on collection category:
+      // - movie/tv: prefer TMDB as source
+      // - anime: prefer Bangumi (bgm) as source
+      String preferredSourceType;
+      String preferredSourceId;
+      String preferredSourceUrl;
+
+      if (mediaType == 'anime') {
+        // For anime, prefer Bangumi source
+        preferredSourceType = 'bgm';
+        // If current source is not Bangumi, keep current IDs but mark as bgm source
+        // This signals to the backend that this is anime content
+        if (widget.media.sourceType == 'bgm') {
+          preferredSourceId = widget.media.sourceId;
+          preferredSourceUrl = widget.media.sourceUrl;
+        } else {
+          // Use current source ID but with bgm sourceType
+          // Generate a Bangumi-style URL based on title for reference
+          preferredSourceId = widget.media.sourceId;
+          preferredSourceUrl = 'https://bgm.tv/subject_search/${Uri.encodeComponent(widget.media.titleZh)}?cat=2';
+        }
+      } else {
+        // For movie/tv, prefer TMDB source
+        preferredSourceType = 'tmdb';
+        if (widget.media.sourceType == 'tmdb') {
+          preferredSourceId = widget.media.sourceId;
+          preferredSourceUrl = widget.media.sourceUrl;
+        } else {
+          preferredSourceId = widget.media.sourceId;
+          preferredSourceUrl = 'https://www.themoviedb.org/$mediaType/${widget.media.sourceId}';
+        }
+      }
+
+      // Modify media with preferred source type
+      Media modifiedMedia = widget.media.copyWith(
         mediaType: mediaType,
+        sourceType: preferredSourceType,
+        sourceId: preferredSourceId,
+        sourceUrl: preferredSourceUrl,
       );
+
+      // For TMDb items (movie/tv), fetch fresh details to get complete data including number_of_episodes
+      if (preferredSourceType == 'tmdb' && (mediaType == 'movie' || mediaType == 'tv')) {
+        try {
+          final fullMedia = await TmdbService().getMediaDetail(
+            widget.media.sourceId,
+            mediaType,
+          );
+          if (fullMedia != null) {
+            // Merge the fresh data with our modified media type settings
+            modifiedMedia = fullMedia.copyWith(
+              mediaType: mediaType,
+              sourceType: preferredSourceType,
+              sourceId: preferredSourceId,
+              sourceUrl: preferredSourceUrl,
+            );
+          }
+        } catch (e) {
+          // If detail fetch fails, continue with original data
+          debugPrint('Failed to fetch TMDb details: $e');
+        }
+      }
 
       final newId = await _repo.addToCollection(modifiedMedia, status: 'wish');
       if (mounted) {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/auth_repository.dart';
 
 import '../../../../app/theme/app_theme.dart';
@@ -32,11 +31,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _handleGithubLogin() async {
     try {
-      await _authRepository.signInWithGithub();
-    } on AuthException catch (e) {
-      if (mounted) {
-        AppSnackBar.showError(context, error: e);
-      }
+      await _authRepository.signInWithOAuth('github');
     } catch (e) {
       if (mounted) {
         AppSnackBar.showError(context, message: '登录失败，请稍后重试');
@@ -75,13 +70,27 @@ class _LoginPageState extends State<LoginPage> {
           context.go('/home');
         }
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        AppSnackBar.showError(context, error: e);
-      }
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, message: '登录失败，请稍后重试');
+        final errorMessage = e.toString().toLowerCase();
+
+        // Handle "session already exists" - user is already logged in
+        if (errorMessage.contains('session_exists') || errorMessage.contains('already signed in')) {
+          // Just navigate to home since they're already logged in
+          context.go('/home');
+          return;
+        }
+
+        // Handle wrong password / invalid credentials
+        if (errorMessage.contains('invalid') ||
+            errorMessage.contains('password') ||
+            errorMessage.contains('credentials')) {
+          AppSnackBar.showError(context, message: '邮箱或密码错误，请重试');
+        } else if (errorMessage.contains('network') || errorMessage.contains('connection')) {
+          AppSnackBar.showNetworkError(context);
+        } else {
+          AppSnackBar.showError(context, message: '登录失败: ${e.toString()}');
+        }
       }
     } finally {
       if (mounted) {
@@ -309,7 +318,7 @@ class _LoginPageState extends State<LoginPage> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        "or continue with",
+                        "其他登录方式",
                         style: TextStyle(
                           color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                           fontSize: 14,

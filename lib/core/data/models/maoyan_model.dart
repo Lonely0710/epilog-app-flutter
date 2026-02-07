@@ -69,8 +69,7 @@ class MaoyanModel {
     final genresStr = json['cat'] ?? '';
 
     // isNew logic
-    final bool isNew = json['showStateButton'] != null &&
-        json['showStateButton']['content'] == '购票';
+    final bool isNew = json['showStateButton'] != null && json['showStateButton']['content'] == '购票';
 
     return MaoyanModel(
       id: id,
@@ -95,19 +94,10 @@ class MaoyanModel {
     if (director.isNotEmpty) staff += '导演: $director ';
     if (actorsStr.isNotEmpty) staff += '主演: $actorsStr';
 
-    final genreList = genresStr
-        .split(',')
-        .map((s) => s.trim().toString())
-        .where((s) => s.isNotEmpty)
-        .toList();
-
-    final actorList = actorsStr
-        .split(',')
-        .map((s) => s.trim().toString())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    final actorList = actorsStr.split(',').map((s) => s.trim().toString()).where((s) => s.isNotEmpty).toList();
 
     return Media(
+      id: '',
       sourceType: 'maoyan',
       sourceId: id,
       sourceUrl: 'https://m.maoyan.com/movie/$id',
@@ -124,8 +114,6 @@ class MaoyanModel {
       ratingMaoyan: score,
       directors: director.isNotEmpty ? [director] : [],
       actors: actorList,
-      genres: genreList,
-      wish: wish,
       isNew: isNew,
     );
   }

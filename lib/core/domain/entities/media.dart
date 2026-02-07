@@ -1,4 +1,7 @@
 class Media {
+  // ID
+  final String id;
+
   // media_source相关字段
   final String sourceType; // douban/imdb/bgm/maoyan
   final String sourceId;
@@ -16,6 +19,7 @@ class Media {
   final String staff; // 制作人员 (Anime usage)
   final List<String> directors;
   final List<String> actors;
+  final List<Map<String, String>> networks; // TV broadcast platforms [{name, logoUrl}]
 
   // 评分相关
   final double rating; // 综合评分(用于兼容旧版本)
@@ -28,11 +32,11 @@ class Media {
   final bool isCollected;
   final String collectionId; // 收藏记录ID
   final String? watchingStatus; // 'wish', 'watching', 'watched', 'dropped', 'on_hold'
-  final List<String> genres; // 电影类型
+
   final bool isNew; // 是否新上映
-  final String wish; // 想看人数
 
   const Media({
+    required this.id,
     required this.sourceType,
     required this.sourceId,
     required this.sourceUrl,
@@ -47,6 +51,7 @@ class Media {
     required this.staff,
     this.directors = const [],
     this.actors = const [],
+    this.networks = const [],
     required this.rating,
     this.ratingDouban = 0.0,
     this.ratingImdb = 0.0,
@@ -55,13 +60,12 @@ class Media {
     this.isCollected = false,
     this.collectionId = '',
     this.watchingStatus,
-    this.genres = const [],
     this.isNew = false,
-    this.wish = '',
   });
 
   factory Media.empty() {
     return const Media(
+      id: '',
       sourceType: '',
       sourceId: '',
       sourceUrl: '',
@@ -74,12 +78,36 @@ class Media {
       posterUrl: '',
       summary: '',
       staff: '',
+      networks: <Map<String, String>>[],
       rating: 0.0,
     );
   }
 
   factory Media.fromJson(Map<String, dynamic> json) {
+    // Handle staff field - can be JSON object or legacy string
+    String staffStr = '';
+    List<String> directors = [];
+    List<String> actors = [];
+
+    final staffData = json['staff'];
+    if (staffData is Map<String, dynamic>) {
+      staffStr = staffData['info'] ?? '';
+      directors = (staffData['directors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+      actors = (staffData['actors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+    } else if (staffData is String) {
+      staffStr = staffData;
+    }
+
+    // Override with top-level directors/actors if present
+    if (json['directors'] != null) {
+      directors = (json['directors'] as List<dynamic>).map((e) => e.toString()).toList();
+    }
+    if (json['actors'] != null) {
+      actors = (json['actors'] as List<dynamic>).map((e) => e.toString()).toList();
+    }
+
     return Media(
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       sourceType: json['sourceType'] ?? '',
       sourceId: json['sourceId'] ?? '',
       sourceUrl: json['sourceUrl'] ?? '',
@@ -91,21 +119,26 @@ class Media {
       year: json['year'] ?? '',
       posterUrl: json['posterUrl'] ?? '',
       summary: json['summary'] ?? '',
-      staff: json['staff'] ?? '',
-      directors: (json['directors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-      actors: (json['actors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
-      ratingDouban: (json['ratingDouban'] as num?)?.toDouble() ?? 0.0,
-      ratingImdb: (json['ratingImdb'] as num?)?.toDouble() ?? 0.0,
-      ratingBangumi: (json['ratingBangumi'] as num?)?.toDouble() ?? 0.0,
-      ratingMaoyan: (json['ratingMaoyan'] as num?)?.toDouble() ?? 0.0,
-      genres: (json['genres'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-      wish: json['wish'] ?? '',
+      staff: staffStr,
+      directors: directors,
+      actors: actors,
+      networks: _parseNetworks(json['networks']),
+      rating: _parseDouble(json['rating']),
+      ratingDouban: _parseDouble(json['ratingDouban']),
+      ratingImdb: _parseDouble(json['ratingImdb']),
+      ratingBangumi: _parseDouble(json['ratingBangumi']),
+      ratingMaoyan: _parseDouble(json['ratingMaoyan']),
+
       isNew: json['isNew'] ?? false,
+      // Collection state fields
+      collectionId: json['collectionId']?.toString() ?? '',
+      watchingStatus: json['watchingStatus'] as String?,
+      isCollected: json['isCollected'] ?? false,
     );
   }
 
   Media copyWith({
+    String? id,
     String? sourceType,
     String? sourceId,
     String? sourceUrl,
@@ -120,6 +153,7 @@ class Media {
     String? staff,
     List<String>? directors,
     List<String>? actors,
+    List<Map<String, String>>? networks,
     double? rating,
     double? ratingDouban,
     double? ratingImdb,
@@ -128,11 +162,10 @@ class Media {
     bool? isCollected,
     String? collectionId,
     String? watchingStatus,
-    List<String>? genres,
     bool? isNew,
-    String? wish,
   }) {
     return Media(
+      id: id ?? this.id,
       sourceType: sourceType ?? this.sourceType,
       sourceId: sourceId ?? this.sourceId,
       sourceUrl: sourceUrl ?? this.sourceUrl,
@@ -147,6 +180,7 @@ class Media {
       staff: staff ?? this.staff,
       directors: directors ?? this.directors,
       actors: actors ?? this.actors,
+      networks: networks ?? this.networks,
       rating: rating ?? this.rating,
       ratingDouban: ratingDouban ?? this.ratingDouban,
       ratingImdb: ratingImdb ?? this.ratingImdb,
@@ -155,9 +189,34 @@ class Media {
       isCollected: isCollected ?? this.isCollected,
       collectionId: collectionId ?? this.collectionId,
       watchingStatus: watchingStatus ?? this.watchingStatus,
-      genres: genres ?? this.genres,
       isNew: isNew ?? this.isNew,
-      wish: wish ?? this.wish,
     );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      if (value.isEmpty) return 0.0;
+      return double.tryParse(value) ?? 0.0;
+    }
+    return 0.0;
+  }
+
+  static List<Map<String, String>> _parseNetworks(dynamic value) {
+    if (value == null) return [];
+    if (value is! List) return [];
+    return value
+        .map<Map<String, String>>((net) {
+          if (net is Map) {
+            return {
+              'name': net['name']?.toString() ?? '',
+              'logoUrl': net['logoUrl']?.toString() ?? '',
+            };
+          }
+          return {'name': '', 'logoUrl': ''};
+        })
+        .where((n) => n['name']!.isNotEmpty)
+        .toList();
   }
 }

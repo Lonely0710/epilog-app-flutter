@@ -5,7 +5,6 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../core/domain/entities/media.dart';
 import '../../../../core/presentation/widgets/app_snack_bar.dart';
 import '../../../../core/router/scaffold_with_nav_bar.dart';
-import '../../../collections/data/repositories/collection_repository_impl.dart';
 import '../../../collections/domain/repositories/collection_repository.dart';
 import '../widgets/grid_layout_switcher.dart';
 import '../widgets/jelly_page_switcher.dart';
@@ -25,8 +24,7 @@ class LibraryPage extends StatefulWidget {
   State<LibraryPage> createState() => _LibraryPageState();
 }
 
-class _LibraryPageState extends State<LibraryPage>
-    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+class _LibraryPageState extends State<LibraryPage> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late final PageController _pageController;
   late final CollectionRepository _repository;
   StreamSubscription? _subscription;
@@ -55,7 +53,7 @@ class _LibraryPageState extends State<LibraryPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _pageController = PageController();
-    _repository = CollectionRepositoryImpl();
+    _repository = CollectionRepository();
 
     // Initialize FAB animation controller with spring-like curve
     _fabAnimController = AnimationController(
@@ -168,15 +166,13 @@ class _LibraryPageState extends State<LibraryPage>
     );
   }
 
-  int get _currentCount =>
-      _isAnimeWall ? _animeWallItems.length : _mediaLibraryItems.length;
+  int get _currentCount => _isAnimeWall ? _animeWallItems.length : _mediaLibraryItems.length;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? AppColors.backgroundDark
-          : AppColors.surfaceVariant,
+      backgroundColor:
+          Theme.of(context).brightness == Brightness.dark ? AppColors.backgroundDark : AppColors.surfaceVariant,
       body: Stack(
         children: [
           // 1. Main Content
@@ -199,8 +195,7 @@ class _LibraryPageState extends State<LibraryPage>
                       // 2-column mode: 2 rows (2x2 = 4 posters)
                       // 3-column mode: 3 rows (3x3 = 9 posters)
                       final rowCount = _isCompactMode ? 3 : 2;
-                      final spacing =
-                          _isCompactMode ? 24.0 : 16.0; // mainAxisSpacing
+                      final spacing = _isCompactMode ? 24.0 : 16.0; // mainAxisSpacing
                       final itemHeight = (availableHeight - spacing) / rowCount;
 
                       final availableWidth = constraints.maxWidth;
@@ -260,13 +255,11 @@ class _LibraryPageState extends State<LibraryPage>
                   curve: Curves.easeInOut,
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
-                      center: const Alignment(
-                          0.0, 0.0), // Center of the screen (Posters)
+                      center: const Alignment(0.0, 0.0), // Center of the screen (Posters)
                       radius: 1.0, // Focus light on content
                       colors: [
                         Colors.transparent, // Lit area
-                        AppColors.shadowDark.withValues(
-                            alpha: 0.5), // Subtler dark surroundings
+                        AppColors.shadowDark.withValues(alpha: 0.5), // Subtler dark surroundings
                       ],
                       stops: const [0.2, 1.0],
                     ),
@@ -387,8 +380,7 @@ class _LibraryPageState extends State<LibraryPage>
   Widget _buildTitleRow() {
     // 1. Determine Banner Asset & Text Color
     // Logic: Always use Red for Anime, Yellow for Movie
-    final isDark = Theme.of(context).brightness ==
-        Brightness.dark; // Keep for key if needed, or remove
+    final isDark = Theme.of(context).brightness == Brightness.dark; // Keep for key if needed, or remove
     String bannerAsset;
     Color titleColor;
 
@@ -417,17 +409,14 @@ class _LibraryPageState extends State<LibraryPage>
           );
         },
         child: Container(
-          key: ValueKey(
-              '$_isAnimeWall-$isDark'), // Rebuild on state/theme change
+          key: ValueKey('$_isAnimeWall-$isDark'), // Rebuild on state/theme change
           height: 80, // Approximate height for banner
           decoration: BoxDecoration(
             image: DecorationImage(
               image: AssetImage(bannerAsset),
-              fit: BoxFit
-                  .cover, // Or BoxFit.fill depending on asset aspect ratio
+              fit: BoxFit.cover, // Or BoxFit.fill depending on asset aspect ratio
             ),
-            borderRadius:
-                BorderRadius.circular(16), // Rounded corners for banner
+            borderRadius: BorderRadius.circular(16), // Rounded corners for banner
             boxShadow: [
               BoxShadow(
                 color: AppColors.shadowDark.withValues(alpha: 0.1),
